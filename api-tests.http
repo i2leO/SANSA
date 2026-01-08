@@ -1,0 +1,505 @@
+# SANSA API Testing Examples
+
+This file contains HTTP requests for testing the SANSA API using the REST Client extension for VS Code.
+
+## Prerequisites
+
+Install the "REST Client" VS Code extension: `humao.rest-client`
+
+## Configuration
+
+@baseUrl = http://localhost:8000
+@token = your-jwt-token-here
+
+# ============================================
+# Authentication
+# ============================================
+
+### Login as admin
+POST {{baseUrl}}/auth/login
+Content-Type: application/x-www-form-urlencoded
+
+username=admin&password=admin123
+
+### Register new user (requires admin token)
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "username": "researcher1",
+  "email": "researcher@example.com",
+  "password": "SecurePass123!",
+  "role": "staff",
+  "full_name": "Dr. Research Staff"
+}
+
+### Get current user info
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{token}}
+
+### Refresh token
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+
+{
+  "refresh_token": "your-refresh-token-here"
+}
+
+# ============================================
+# Respondents
+# ============================================
+
+### Create new respondent
+POST {{baseUrl}}/respondents
+Content-Type: application/json
+
+{
+  "code": "RES12345678"
+}
+
+### Get all respondents (paginated)
+GET {{baseUrl}}/respondents?skip=0&limit=20
+Authorization: Bearer {{token}}
+
+### Search respondents by code
+GET {{baseUrl}}/respondents?search=RES12
+Authorization: Bearer {{token}}
+
+### Get specific respondent
+GET {{baseUrl}}/respondents/1
+Authorization: Bearer {{token}}
+
+### Update respondent
+PUT {{baseUrl}}/respondents/1
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "general_info": {
+    "age": 45,
+    "sex": 2,
+    "education_level": 3,
+    "income_range": 2,
+    "occupation": "Teacher",
+    "marital_status": 1,
+    "living_arrangement": 2
+  }
+}
+
+### Delete respondent (soft delete)
+DELETE {{baseUrl}}/respondents/1
+Authorization: Bearer {{token}}
+
+# ============================================
+# SANSA Assessment
+# ============================================
+
+### Submit SANSA response (auto-calculates scores)
+POST {{baseUrl}}/sansa
+Content-Type: application/json
+
+{
+  "respondent_id": 1,
+  "visit_id": 1,
+  "screening_responses": {
+    "q1": 1,
+    "q2": 1,
+    "q3": 0,
+    "q4": 1
+  },
+  "dietary_responses": {
+    "d01": 4,
+    "d02": 4,
+    "d03": 3,
+    "d04": 4,
+    "d05": 3,
+    "d06": 4,
+    "d07": 3,
+    "d08": 4,
+    "d09": 3,
+    "d10": 4,
+    "d11": 3,
+    "d12": 4
+  },
+  "scoring_version_id": 1
+}
+
+### Get SANSA response details
+GET {{baseUrl}}/sansa/1
+
+### Get nutritional advice based on SANSA results
+GET {{baseUrl}}/sansa/1/advice
+
+# ============================================
+# MNA Assessment (when implemented)
+# ============================================
+
+### Submit MNA response
+POST {{baseUrl}}/mna
+Content-Type: application/json
+
+{
+  "respondent_id": 1,
+  "visit_id": 1,
+  "responses": {
+    "q01": 2,
+    "q02": 2,
+    "q03": 1,
+    "q04": 1,
+    "q05": 2,
+    "q06": 1,
+    "q07": 2,
+    "q08": 1,
+    "q09": 2,
+    "q10": 1,
+    "q11": 2,
+    "q12": 1,
+    "q13": 2,
+    "q14": 1,
+    "q15": 2,
+    "q16": 1,
+    "q17": 2,
+    "q18": 1
+  },
+  "scoring_version_id": 2
+}
+
+### Get MNA response
+GET {{baseUrl}}/mna/1
+
+# ============================================
+# BIA Measurements (when implemented)
+# ============================================
+
+### Submit BIA record
+POST {{baseUrl}}/bia
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "respondent_id": 1,
+  "visit_id": 1,
+  "weight": 65.5,
+  "height": 165.0,
+  "waist_circumference": 85.0,
+  "impedance": 550,
+  "body_fat_percentage": 28.5,
+  "muscle_mass": 45.2,
+  "recorded_by_id": 1
+}
+
+### Get BIA records for respondent
+GET {{baseUrl}}/bia?respondent_id=1
+Authorization: Bearer {{token}}
+
+# ============================================
+# Satisfaction Survey (when implemented)
+# ============================================
+
+### Submit satisfaction survey
+POST {{baseUrl}}/satisfaction
+Content-Type: application/json
+
+{
+  "respondent_id": 1,
+  "visit_id": 1,
+  "responses": {
+    "q1": 5,
+    "q2": 4,
+    "q3": 5,
+    "q4": 4,
+    "q5": 5
+  }
+}
+
+# ============================================
+# Food Diary (when implemented)
+# ============================================
+
+### Create food diary entry
+POST {{baseUrl}}/food-diary
+Content-Type: application/json
+
+{
+  "respondent_id": 1,
+  "entry_date": "2026-01-20",
+  "meal_time": "breakfast",
+  "foods": "Rice porridge with egg, banana",
+  "notes": "Ate at 8 AM"
+}
+
+### Upload food photo
+POST {{baseUrl}}/food-diary/1/photos
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="file"; filename="breakfast.jpg"
+Content-Type: image/jpeg
+
+< ./path/to/breakfast.jpg
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+### Get food diary entries for respondent
+GET {{baseUrl}}/food-diary?respondent_id=1
+
+# ============================================
+# Knowledge Posts (when implemented)
+# ============================================
+
+### Create knowledge post
+POST {{baseUrl}}/knowledge
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "title": "Benefits of Regular Vegetables",
+  "content": "Vegetables provide essential vitamins and minerals...",
+  "category": "nutrition",
+  "author_id": 1,
+  "is_published": true
+}
+
+### Get all published knowledge posts
+GET {{baseUrl}}/knowledge?published=true
+
+### Get specific knowledge post
+GET {{baseUrl}}/knowledge/1
+
+### Update knowledge post
+PUT {{baseUrl}}/knowledge/1
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "title": "Updated Title",
+  "content": "Updated content..."
+}
+
+### Delete knowledge post
+DELETE {{baseUrl}}/knowledge/1
+Authorization: Bearer {{token}}
+
+# ============================================
+# Facilities (when implemented)
+# ============================================
+
+### Create facility
+POST {{baseUrl}}/facilities
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Community Health Center #1",
+  "facility_type": "health_center",
+  "address": "123 Main St, Bangkok",
+  "district": "Pathum Wan",
+  "province": "Bangkok",
+  "phone": "02-123-4567",
+  "services": "General health checkup, nutrition counseling",
+  "latitude": 13.7563,
+  "longitude": 100.5018
+}
+
+### Get all facilities
+GET {{baseUrl}}/facilities
+
+### Search facilities by district
+GET {{baseUrl}}/facilities?district=Pathum Wan
+
+### Search facilities by type
+GET {{baseUrl}}/facilities?type=health_center
+
+### Get specific facility
+GET {{baseUrl}}/facilities/1
+
+### Update facility
+PUT {{baseUrl}}/facilities/1
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "phone": "02-123-9999",
+  "services": "Updated services list"
+}
+
+### Delete facility
+DELETE {{baseUrl}}/facilities/1
+Authorization: Bearer {{token}}
+
+# ============================================
+# Data Export
+# ============================================
+
+### Export SANSA data to SPSS CSV
+GET {{baseUrl}}/exports/sansa.csv
+Authorization: Bearer {{token}}
+
+### Export MNA data
+GET {{baseUrl}}/exports/mna.csv
+Authorization: Bearer {{token}}
+
+### Export BIA data
+GET {{baseUrl}}/exports/bia.csv
+Authorization: Bearer {{token}}
+
+### Export combined dataset
+GET {{baseUrl}}/exports/combined.csv
+Authorization: Bearer {{token}}
+
+### Export with date filter (when implemented)
+GET {{baseUrl}}/exports/sansa.csv?start_date=2026-01-01&end_date=2026-12-31
+Authorization: Bearer {{token}}
+
+# ============================================
+# Scoring Rules (when implemented)
+# ============================================
+
+### Get all scoring rule versions
+GET {{baseUrl}}/scoring-rules/versions
+Authorization: Bearer {{token}}
+
+### Get active scoring version for instrument
+GET {{baseUrl}}/scoring-rules/versions/active?instrument=SANSA
+
+### Create new scoring rule version
+POST {{baseUrl}}/scoring-rules/versions
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "instrument_name": "SANSA",
+  "version_number": "2.0",
+  "description": "Updated thresholds based on new research",
+  "rules": [
+    {
+      "rule_code": "total_score",
+      "rule_name": "Total Score",
+      "description": "Sum of screening and dietary scores",
+      "values": [
+        {
+          "level_code": "normal",
+          "level_name": "Normal Nutrition",
+          "min_score": 40,
+          "max_score": 48
+        },
+        {
+          "level_code": "at_risk",
+          "level_name": "At Risk of Malnutrition",
+          "min_score": 26,
+          "max_score": 39
+        },
+        {
+          "level_code": "malnourished",
+          "level_name": "Malnourished",
+          "min_score": 0,
+          "max_score": 25
+        }
+      ]
+    }
+  ]
+}
+
+### Update scoring rule version
+PUT {{baseUrl}}/scoring-rules/versions/1
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "is_active": false
+}
+
+# ============================================
+# Health Check
+# ============================================
+
+### Check API health
+GET {{baseUrl}}/health
+
+### Get API documentation
+GET {{baseUrl}}/docs
+
+### Get OpenAPI schema
+GET {{baseUrl}}/openapi.json
+
+# ============================================
+# Testing Scenarios
+# ============================================
+
+### Scenario 1: Complete respondent flow
+# 1. Create respondent
+# 2. Submit general info
+# 3. Submit SANSA assessment
+# 4. Get results and advice
+# 5. Submit satisfaction survey
+# 6. Export data
+
+### Scenario 2: Staff workflow
+# 1. Login as staff
+# 2. Get respondent list
+# 3. Select respondent
+# 4. Enter BIA measurements
+# 5. Enter MNA assessment
+# 6. View complete profile
+
+### Scenario 3: Admin tasks
+# 1. Login as admin
+# 2. Create new staff user
+# 3. Update scoring rules
+# 4. Export all data
+# 5. View audit log
+
+# ============================================
+# Error Testing
+# ============================================
+
+### Test validation error (missing required field)
+POST {{baseUrl}}/respondents
+Content-Type: application/json
+
+{
+  "code": ""
+}
+
+### Test authentication error (no token)
+GET {{baseUrl}}/respondents
+
+### Test not found error
+GET {{baseUrl}}/respondents/99999
+Authorization: Bearer {{token}}
+
+### Test duplicate code error
+POST {{baseUrl}}/respondents
+Content-Type: application/json
+
+{
+  "code": "RES12345678"
+}
+
+# ============================================
+# Performance Testing
+# ============================================
+
+### Test pagination
+GET {{baseUrl}}/respondents?skip=0&limit=100
+Authorization: Bearer {{token}}
+
+### Test large export
+GET {{baseUrl}}/exports/combined.csv
+Authorization: Bearer {{token}}
+
+# ============================================
+# Notes
+# ============================================
+
+# To use these requests:
+# 1. Install REST Client extension
+# 2. Replace {{token}} with actual JWT token from login response
+# 3. Update {{baseUrl}} if using different port
+# 4. Click "Send Request" above any ### comment
+
+# Tips:
+# - Use Ctrl+Alt+R (or Cmd+Alt+R on Mac) to send request
+# - Use Ctrl+Alt+C to cancel request
+# - Save responses with Ctrl+Alt+S
+# - Environment variables can be defined at the top of this file
