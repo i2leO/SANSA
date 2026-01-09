@@ -6,9 +6,12 @@ import string
 from app.database import get_db
 from app.models import Respondent, User
 from app.schemas import (
-    RespondentCreate, RespondentUpdate, RespondentResponse, MessageResponse
+    RespondentCreate,
+    RespondentUpdate,
+    RespondentResponse,
+    MessageResponse,
 )
-from app.auth import get_current_staff_or_admin
+from app.auth import get_current_staff_or_admin, get_current_user_optional
 
 router = APIRouter(prefix="/respondents", tags=["respondents"])
 
@@ -16,14 +19,14 @@ router = APIRouter(prefix="/respondents", tags=["respondents"])
 def generate_respondent_code() -> str:
     """Generate a random anonymous respondent code"""
     # Format: RES + 8 random alphanumeric characters
-    return "RES" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+    return "RES" + "".join(random.choices(string.ascii_uppercase + string.digits, k=8))
 
 
 @router.post("", response_model=RespondentResponse)
-def create_respondent(
+async def create_respondent(
     respondent_create: RespondentCreate,
     db: Session = Depends(get_db),
-    current_user: Optional[User] = Depends(get_current_staff_or_admin)
+    current_user: Optional[User] = Depends(get_current_user_optional),
 ):
     """
     Create a new respondent
@@ -34,46 +37,50 @@ def create_respondent(
         while True:
             code = generate_respondent_code()
             # Check if code exists
-            existing = db.query(Respondent).filter(
-                Respondent.respondent_code == code
-            ).first()
+            existing = (
+                db.query(Respondent).filter(Respondent.respondent_code == code).first()
+            )
             if not existing:
                 respondent_create.respondent_code = code
                 break
     else:
         # Check if provided code already exists
-        existing = db.query(Respondent).filter(
-            Respondent.respondent_code == respondent_create.respondent_code
-        ).first()
+        existing = (
+            db.query(Respondent)
+            .filter(Respondent.respondent_code == respondent_create.respondent_code)
+            .first()
+        )
         if existing:
-            raise HTTPException(status_code=400, detail="Respondent code already exists")
-    
+            raise HTTPException(
+                status_code=400, detail="Respondent code already exists"
+            )
+
     new_respondent = Respondent(
-        **respondent_create.dict(),
-        created_by=current_user.id if current_user else None
+        **respondent_create.dict(), created_by=current_user.id if current_user else None
     )
-    
+
     db.add(new_respondent)
     db.commit()
     db.refresh(new_respondent)
-    
+
     return new_respondent
 
 
 @router.get("/{respondent_code}", response_model=RespondentResponse)
-def get_respondent_by_code(
-    respondent_code: str,
-    db: Session = Depends(get_db)
-):
+def get_respondent_by_code(respondent_code: str, db: Session = Depends(get_db)):
     """Get respondent by code (no auth required for self-service)"""
-    respondent = db.query(Respondent).filter(
-        Respondent.respondent_code == respondent_code,
-        Respondent.is_deleted == False
-    ).first()
-    
+    respondent = (
+        db.query(Respondent)
+        .filter(
+            Respondent.respondent_code == respondent_code,
+            Respondent.is_deleted == False,
+        )
+        .first()
+    )
+
     if not respondent:
         raise HTTPException(status_code=404, detail="Respondent not found")
-    
+
     return respondent
 
 
@@ -83,18 +90,18 @@ def list_respondents(
     limit: int = 100,
     search: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_staff_or_admin)
+    current_user: User = Depends(get_current_staff_or_admin),
 ):
     """List respondents (staff/admin only)"""
     query = db.query(Respondent).filter(Respondent.is_deleted == False)
-    
+
     if search:
         query = query.filter(
-            (Respondent.respondent_code.contains(search)) |
-            (Respondent.phone.contains(search)) |
-            (Respondent.email.contains(search))
+            (Respondent.respondent_code.contains(search))
+            | (Respondent.phone.contains(search))
+            | (Respondent.email.contains(search))
         )
-    
+
     respondents = query.offset(skip).limit(limit).all()
     return respondents
 
@@ -104,24 +111,25 @@ def update_respondent(
     respondent_id: int,
     respondent_update: RespondentUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_staff_or_admin)
+    current_user: User = Depends(get_current_staff_or_admin),
 ):
     """Update respondent (staff/admin only)"""
-    respondent = db.query(Respondent).filter(
-        Respondent.id == respondent_id,
-        Respondent.is_deleted == False
-    ).first()
-    
+    respondent = (
+        db.query(Respondent)
+        .filter(Respondent.id == respondent_id, Respondent.is_deleted == False)
+        .first()
+    )
+
     if not respondent:
         raise HTTPException(status_code=404, detail="Respondent not found")
-    
+
     update_data = respondent_update.dict(exclude_unset=True)
     for field, value in update_data.items():
         setattr(respondent, field, value)
-    
+
     db.commit()
     db.refresh(respondent)
-    
+
     return respondent
 
 
@@ -129,34 +137,34 @@ def update_respondent(
 def delete_respondent(
     respondent_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_staff_or_admin)
+    current_user: User = Depends(get_current_staff_or_admin),
 ):
     """Soft delete respondent (staff/admin only)"""
-    respondent = db.query(Respondent).filter(
-        Respondent.id == respondent_id
-    ).first()
-    
+    respondent = db.query(Respondent).filter(Respondent.id == respondent_id).first()
+
     if not respondent:
         raise HTTPException(status_code=404, detail="Respondent not found")
-    
+
     respondent.is_deleted = True
     db.commit()
-    
+
     return {"message": "Respondent deleted successfully"}
 
 
-@router.post("/check-code", response_model=dict)
-def check_respondent_code(
-    code: str,
-    db: Session = Depends(get_db)
-):
+@router.post("/check-code")
+def check_respondent_code(request: dict, db: Session = Depends(get_db)):
     """Check if respondent code exists (for login/registration flow)"""
-    respondent = db.query(Respondent).filter(
-        Respondent.respondent_code == code,
-        Respondent.is_deleted == False
-    ).first()
-    
+    code = request.get("code")
+    if not code:
+        raise HTTPException(status_code=400, detail="Code is required")
+
+    respondent = (
+        db.query(Respondent)
+        .filter(Respondent.respondent_code == code, Respondent.is_deleted == False)
+        .first()
+    )
+
     return {
         "exists": respondent is not None,
-        "respondent_id": respondent.id if respondent else None
+        "respondent_id": respondent.id if respondent else None,
     }

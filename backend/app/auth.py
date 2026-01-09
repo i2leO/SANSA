@@ -131,6 +131,27 @@ async def get_current_staff_or_admin(
     return current_user
 
 
+async def get_current_user_optional(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(
+        HTTPBearer(auto_error=False)
+    ),
+    db: Session = Depends(get_db),
+) -> Optional[User]:
+    """Get current user if authenticated, None if not (no error thrown)"""
+    if not credentials:
+        return None
+
+    try:
+        token = credentials.credentials
+        token_data = decode_token(token)
+        user = db.query(User).filter(User.id == token_data.user_id).first()
+        if user and user.is_active:
+            return user
+        return None
+    except:
+        return None
+
+
 def authenticate_user(db: Session, username: str, password: str) -> Optional[User]:
     """Authenticate a user"""
     user = db.query(User).filter(User.username == username).first()

@@ -48,16 +48,42 @@ export default function SANSAFormPage() {
     setError(null);
 
     try {
-      // Get visit ID first (assuming latest visit for this respondent)
-      // In production, you'd fetch the actual visit ID
-      const visitId = 1; // Replace with actual visit ID fetching logic
+      // Step 1: Get respondent info by code
+      const respondentResponse = await apiClient.get(`/respondents/${respondentCode}`);
+      const respondent = respondentResponse.data;
 
+      // Step 2: Create a new visit for this assessment
+      const visitResponse = await apiClient.post("/visits", {
+        respondent_id: respondent.id,
+        visit_type: "baseline",
+        entry_mode: "self",
+      });
+      const visit = visitResponse.data;
+
+      // Step 3: Submit SANSA response
       await apiClient.post("/sansa", {
-        visit_id: visitId,
-        ...data,
+        visit_id: visit.id,
+        // Map form field names to match backend schema
+        q1_weight_change: data.q1_weight_change,
+        q2_food_intake: data.q2_food_intake,
+        q3_daily_activities: data.q3_daily_activities,
+        q4_chronic_disease: data.q4_chronic_disease,
+        q5_meals_per_day: data.q5_meals_per_day,
+        q6_portion_size: data.q6_portion_size,
+        q7_food_texture: data.q7_food_texture,
+        q8_rice_grains: data.q8_rice_starch,
+        q9_protein_legumes: data.q9_protein,
+        q10_milk_yogurt: data.q10_milk,
+        q11_fruits: data.q11_fruits,
+        q12_vegetables: data.q12_vegetables,
+        q13_water_intake: data.q13_water,
+        q14_sweet_drinks: data.q14_sweet_drinks,
+        q15_cooking_method: data.q15_cooking_method,
+        q16_oil_coconut: data.q16_oil_coconut,
       });
 
-      navigate(`/satisfaction/${respondentCode}`);
+      // Redirect to results page with visit ID
+      navigate(`/result/${visit.id}`);
     } catch (err: unknown) {
       const error = err as { response?: { data?: { detail?: string } } };
       setError(error.response?.data?.detail || "ไม่สามารถบันทึกข้อมูลได้");
