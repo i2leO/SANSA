@@ -15,10 +15,12 @@ const generalInfoSchema = z.object({
   marital_status: z.string().optional(),
   monthly_income: z.string().optional(),
   income_sources: z.array(z.string()).optional(), // Multiple selections
-  chronic_diseases: z.object({
-    diseases: z.array(z.string()),
-    other: z.string().optional()
-  }).optional(),
+  chronic_diseases: z
+    .object({
+      diseases: z.array(z.string()),
+      other: z.string().optional(),
+    })
+    .optional(),
   living_arrangement: z.string().optional(),
 });
 
@@ -50,10 +52,12 @@ export default function GeneralInfoPage() {
         setRespondent(response.data);
 
         // Pre-fill form if data exists
-        if (response.data.status) setValue("status", response.data.status as "elderly" | "caregiver");
+        if (response.data.status)
+          setValue("status", response.data.status as "elderly" | "caregiver");
         if (response.data.age) setValue("age", response.data.age);
         if (response.data.sex) setValue("sex", response.data.sex as "male" | "female");
-        if (response.data.education_level) setValue("education_level", response.data.education_level);
+        if (response.data.education_level)
+          setValue("education_level", response.data.education_level);
         if (response.data.marital_status) setValue("marital_status", response.data.marital_status);
         if (response.data.monthly_income) setValue("monthly_income", response.data.monthly_income);
         if (response.data.income_sources) {
@@ -65,7 +69,8 @@ export default function GeneralInfoPage() {
           setChronicDiseasesChecked(response.data.chronic_diseases.diseases || []);
           setChronicDiseasesOther(response.data.chronic_diseases.other || "");
         }
-        if (response.data.living_arrangement) setValue("living_arrangement", response.data.living_arrangement);
+        if (response.data.living_arrangement)
+          setValue("living_arrangement", response.data.living_arrangement);
       } catch (err) {
         setError("ไม่สามารถโหลดข้อมูลผู้ตอบได้");
       }
@@ -79,7 +84,7 @@ export default function GeneralInfoPage() {
   const handleIncomeSourceChange = (source: string, checked: boolean) => {
     const updated = checked
       ? [...incomeSourcesChecked, source]
-      : incomeSourcesChecked.filter(s => s !== source);
+      : incomeSourcesChecked.filter((s) => s !== source);
     setIncomeSourcesChecked(updated);
     setValue("income_sources", updated);
   };
@@ -87,11 +92,11 @@ export default function GeneralInfoPage() {
   const handleChronicDiseaseChange = (disease: string, checked: boolean) => {
     const updated = checked
       ? [...chronicDiseasesChecked, disease]
-      : chronicDiseasesChecked.filter(d => d !== disease);
+      : chronicDiseasesChecked.filter((d) => d !== disease);
     setChronicDiseasesChecked(updated);
     setValue("chronic_diseases", {
       diseases: updated,
-      other: chronicDiseasesOther
+      other: chronicDiseasesOther,
     });
   };
 
@@ -105,15 +110,23 @@ export default function GeneralInfoPage() {
         await apiClient.put(`/respondents/${respondent.id}`, data);
       }
 
-      // Create visit
-      const visitData: VisitCreate = {
-        respondent_id: respondent!.id,
-        visit_number: 1,
-        visit_date: new Date().toISOString().split("T")[0],
-        visit_type: "baseline",
-      };
-
-      await apiClient.post("/visits", visitData);
+      // Check if visit exists, if not create one
+      try {
+        const visitsResponse = await apiClient.get(`/visits/respondent/${respondent!.id}`);
+        if (visitsResponse.data.length === 0) {
+          // Create visit only if none exists
+          const visitData: VisitCreate = {
+            respondent_id: respondent!.id,
+            visit_number: 1,
+            visit_date: new Date().toISOString().split("T")[0],
+            visit_type: "baseline",
+          };
+          await apiClient.post("/visits", visitData);
+        }
+      } catch (visitErr) {
+        // If checking visits fails, try to create one anyway
+        console.log("Could not check existing visits, creating new one");
+      }
 
       // Navigate to SANSA form
       navigate(`/sansa/${respondentCode}`);
@@ -141,7 +154,8 @@ export default function GeneralInfoPage() {
           </div>
           <div className="border-t border-gray-200 pt-4 mt-4">
             <p className="text-gray-700">
-              รหัสผู้เข้าร่วม: <span className="font-mono font-bold text-blue-600 text-xl">{respondentCode}</span>
+              รหัสผู้เข้าร่วม:{" "}
+              <span className="font-mono font-bold text-blue-600 text-xl">{respondentCode}</span>
             </p>
           </div>
         </div>
@@ -156,7 +170,6 @@ export default function GeneralInfoPage() {
         {/* Form */}
         <form onSubmit={handleSubmit(onSubmit)} className="bg-white rounded-2xl shadow-xl p-8">
           <div className="space-y-8">
-            
             {/* 1. Status - สถานะ */}
             <div>
               <label className="block text-gray-800 font-bold text-lg mb-3">
@@ -227,9 +240,7 @@ export default function GeneralInfoPage() {
 
             {/* 4. Education Level - ระดับการศึกษา */}
             <div>
-              <label className="block text-gray-800 font-bold text-lg mb-3">
-                4. ระดับการศึกษา
-              </label>
+              <label className="block text-gray-800 font-bold text-lg mb-3">4. ระดับการศึกษา</label>
               <select
                 {...register("education_level")}
                 className="w-full px-5 py-4 text-lg border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500"
@@ -284,17 +295,22 @@ export default function GeneralInfoPage() {
                 7. แหล่งรายได้ (เลือกได้มากกว่า 1 ข้อ)
               </label>
               <div className="space-y-2">
-                {["เงินเดือน/ค่าจ้าง", "เงินบำนาญ", "ลูกหลานให้", "ดอกเบี้ยเงินฝาก", "อื่นๆ"].map((source) => (
-                  <label key={source} className="flex items-center p-4 border-2 border-gray-200 rounded-xl hover:border-blue-400 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={incomeSourcesChecked.includes(source)}
-                      onChange={(e) => handleIncomeSourceChange(source, e.target.checked)}
-                      className="w-5 h-5 text-blue-600 rounded"
-                    />
-                    <span className="ml-3 text-gray-700 font-medium">{source}</span>
-                  </label>
-                ))}
+                {["เงินเดือน/ค่าจ้าง", "เงินบำนาญ", "ลูกหลานให้", "ดอกเบี้ยเงินฝาก", "อื่นๆ"].map(
+                  (source) => (
+                    <label
+                      key={source}
+                      className="flex items-center p-4 border-2 border-gray-200 rounded-xl hover:border-blue-400 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={incomeSourcesChecked.includes(source)}
+                        onChange={(e) => handleIncomeSourceChange(source, e.target.checked)}
+                        className="w-5 h-5 text-blue-600 rounded"
+                      />
+                      <span className="ml-3 text-gray-700 font-medium">{source}</span>
+                    </label>
+                  )
+                )}
               </div>
             </div>
 
@@ -304,17 +320,22 @@ export default function GeneralInfoPage() {
                 8. โรคประจำตัว (เลือกได้มากกว่า 1 ข้อ)
               </label>
               <div className="space-y-2">
-                {["เบาหวาน", "ความดันโลหิตสูง", "ไขมันในเลือดสูง", "โรคหัวใจ", "ไม่มี"].map((disease) => (
-                  <label key={disease} className="flex items-center p-4 border-2 border-gray-200 rounded-xl hover:border-blue-400 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={chronicDiseasesChecked.includes(disease)}
-                      onChange={(e) => handleChronicDiseaseChange(disease, e.target.checked)}
-                      className="w-5 h-5 text-blue-600 rounded"
-                    />
-                    <span className="ml-3 text-gray-700 font-medium">{disease}</span>
-                  </label>
-                ))}
+                {["เบาหวาน", "ความดันโลหิตสูง", "ไขมันในเลือดสูง", "โรคหัวใจ", "ไม่มี"].map(
+                  (disease) => (
+                    <label
+                      key={disease}
+                      className="flex items-center p-4 border-2 border-gray-200 rounded-xl hover:border-blue-400 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={chronicDiseasesChecked.includes(disease)}
+                        onChange={(e) => handleChronicDiseaseChange(disease, e.target.checked)}
+                        className="w-5 h-5 text-blue-600 rounded"
+                      />
+                      <span className="ml-3 text-gray-700 font-medium">{disease}</span>
+                    </label>
+                  )
+                )}
                 <div className="mt-3">
                   <label className="block text-gray-700 mb-2">อื่นๆ (ระบุ)</label>
                   <input
@@ -324,7 +345,7 @@ export default function GeneralInfoPage() {
                       setChronicDiseasesOther(e.target.value);
                       setValue("chronic_diseases", {
                         diseases: chronicDiseasesChecked,
-                        other: e.target.value
+                        other: e.target.value,
                       });
                     }}
                     className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500"
@@ -350,7 +371,6 @@ export default function GeneralInfoPage() {
                 <option value="with_relatives">อยู่กับญาติ</option>
               </select>
             </div>
-
           </div>
 
           {/* Buttons */}
@@ -376,7 +396,10 @@ export default function GeneralInfoPage() {
         <div className="mt-8 text-center text-gray-600">
           <p className="text-sm">ขั้นตอนที่ 1 จาก 3 | ข้อมูลทั่วไป</p>
           <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 h-2 rounded-full" style={{ width: "33%" }}></div>
+            <div
+              className="bg-gradient-to-r from-blue-600 to-indigo-600 h-2 rounded-full"
+              style={{ width: "33%" }}
+            ></div>
           </div>
         </div>
       </div>

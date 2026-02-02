@@ -35,12 +35,13 @@ async def create_visit(
     # Create visit
     new_visit = Visit(
         respondent_id=visit_create.respondent_id,
-        visit_date=visit_create.visit_date or datetime.utcnow(),
+        visit_number=visit_create.visit_number,
+        visit_date=visit_create.visit_date,
+        visit_time=visit_create.visit_time,
         visit_type=visit_create.visit_type,
         facility_id=visit_create.facility_id,
-        entry_mode=visit_create.entry_mode,
-        staff_id=current_user.id if current_user else None,
         notes=visit_create.notes,
+        created_by=current_user.id if current_user else None,
     )
 
     db.add(new_visit)

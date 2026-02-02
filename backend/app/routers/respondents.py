@@ -107,13 +107,13 @@ def list_respondents(
 
 
 @router.put("/{respondent_id}", response_model=RespondentResponse)
-def update_respondent(
+async def update_respondent(
     respondent_id: int,
     respondent_update: RespondentUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_staff_or_admin),
+    current_user: Optional[User] = Depends(get_current_user_optional),
 ):
-    """Update respondent (staff/admin only)"""
+    """Update respondent (staff/admin or self-update)"""
     respondent = (
         db.query(Respondent)
         .filter(Respondent.id == respondent_id, Respondent.is_deleted == False)

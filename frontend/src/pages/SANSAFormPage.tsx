@@ -52,13 +52,23 @@ export default function SANSAFormPage() {
       const respondentResponse = await apiClient.get(`/respondents/${respondentCode}`);
       const respondent = respondentResponse.data;
 
-      // Step 2: Create a new visit for this assessment
-      const visitResponse = await apiClient.post("/visits", {
-        respondent_id: respondent.id,
-        visit_type: "baseline",
-        entry_mode: "self",
-      });
-      const visit = visitResponse.data;
+      // Step 2: Get or use existing visit
+      const visitsResponse = await apiClient.get(`/visits/respondent/${respondent.id}`);
+      let visit;
+
+      if (visitsResponse.data.length > 0) {
+        // Use the latest visit
+        visit = visitsResponse.data[0];
+      } else {
+        // Create new visit if none exists
+        const visitResponse = await apiClient.post("/visits", {
+          respondent_id: respondent.id,
+          visit_number: 1,
+          visit_date: new Date().toISOString().split("T")[0],
+          visit_type: "baseline",
+        });
+        visit = visitResponse.data;
+      }
 
       // Step 3: Submit SANSA response
       await apiClient.post("/sansa", {
@@ -71,12 +81,12 @@ export default function SANSAFormPage() {
         q5_meals_per_day: data.q5_meals_per_day,
         q6_portion_size: data.q6_portion_size,
         q7_food_texture: data.q7_food_texture,
-        q8_rice_grains: data.q8_rice_starch,
-        q9_protein_legumes: data.q9_protein,
-        q10_milk_yogurt: data.q10_milk,
+        q8_rice_starch: data.q8_rice_starch,
+        q9_protein: data.q9_protein,
+        q10_milk: data.q10_milk,
         q11_fruits: data.q11_fruits,
         q12_vegetables: data.q12_vegetables,
-        q13_water_intake: data.q13_water,
+        q13_water: data.q13_water,
         q14_sweet_drinks: data.q14_sweet_drinks,
         q15_cooking_method: data.q15_cooking_method,
         q16_oil_coconut: data.q16_oil_coconut,

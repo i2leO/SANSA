@@ -10,28 +10,38 @@ class ScoringService:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_active_scoring_version(self, instrument_name: str) -> Optional[ScoringRuleVersion]:
+    def get_active_scoring_version(
+        self, instrument_name: str
+    ) -> Optional[ScoringRuleVersion]:
         """Get the currently active scoring version for an instrument"""
-        return self.db.query(ScoringRuleVersion).filter(
-            ScoringRuleVersion.instrument_name == instrument_name,
-            ScoringRuleVersion.is_active == True
-        ).order_by(ScoringRuleVersion.created_at.desc()).first()
+        return (
+            self.db.query(ScoringRuleVersion)
+            .filter(
+                ScoringRuleVersion.instrument_name == instrument_name,
+                ScoringRuleVersion.is_active == True,
+            )
+            .order_by(ScoringRuleVersion.created_at.desc())
+            .first()
+        )
 
     def get_scoring_version(self, version_id: int) -> Optional[ScoringRuleVersion]:
         """Get a specific scoring version by ID"""
-        return self.db.query(ScoringRuleVersion).filter(
-            ScoringRuleVersion.id == version_id
-        ).first()
+        return (
+            self.db.query(ScoringRuleVersion)
+            .filter(ScoringRuleVersion.id == version_id)
+            .first()
+        )
 
     def get_classification_level(
-        self,
-        version_id: int,
-        total_score: Decimal
+        self, version_id: int, total_score: Decimal
     ) -> Optional[str]:
         """Determine classification level based on score and thresholds"""
-        rule_values = self.db.query(ScoringRuleValue).filter(
-            ScoringRuleValue.version_id == version_id
-        ).order_by(ScoringRuleValue.level_order).all()
+        rule_values = (
+            self.db.query(ScoringRuleValue)
+            .filter(ScoringRuleValue.version_id == version_id)
+            .order_by(ScoringRuleValue.level_order)
+            .all()
+        )
 
         for rule_value in rule_values:
             # Handle different threshold configurations
@@ -49,14 +59,20 @@ class ScoringService:
 
     def get_advice_text(self, version_id: int, level_code: str) -> Optional[str]:
         """Get advice text for a classification level"""
-        rule_value = self.db.query(ScoringRuleValue).filter(
-            ScoringRuleValue.version_id == version_id,
-            ScoringRuleValue.level_code == level_code
-        ).first()
+        rule_value = (
+            self.db.query(ScoringRuleValue)
+            .filter(
+                ScoringRuleValue.version_id == version_id,
+                ScoringRuleValue.level_code == level_code,
+            )
+            .first()
+        )
 
         return rule_value.advice_text if rule_value else None
 
-    def calculate_sansa_question_score(self, question_num: int, answer_value: str) -> Decimal:
+    def calculate_sansa_question_score(
+        self, question_num: int, answer_value: str
+    ) -> Decimal:
         """
         Calculate score for a single SANSA question based on answer
 
@@ -73,111 +89,161 @@ class ScoringService:
         scoring_map = {
             # Screening Questions (Q1-Q4)
             1: {  # น้ำหนักตัว (Weight change)
-                "decrease": 2, "ลดลง": 2,
-                "stable": 0, "คงเดิม": 0,
-                "increase": 2, "เพิ่มขึ้น": 2
+                "decrease": 2,
+                "ลดลง": 2,
+                "stable": 0,
+                "คงเดิม": 0,
+                "increase": 2,
+                "เพิ่มขึ้น": 2,
             },
             2: {  # การกินอาหาร (Food intake)
-                "decrease": 2, "น้อยลง": 2,
-                "normal": 0, "ปกติ": 0,
-                "increase": 2, "มากขึ้น": 2
+                "decrease": 2,
+                "น้อยลง": 2,
+                "normal": 0,
+                "ปกติ": 0,
+                "increase": 2,
+                "มากขึ้น": 2,
             },
             3: {  # กิจวัตรประจำวัน (Daily activities)
-                "cannot": 2, "ไม่ได้": 2,
-                "slower": 1, "ช้ากว่าปกติ": 1,
-                "normal": 0, "ปกติ": 0
+                "cannot": 2,
+                "ไม่ได้": 2,
+                "slower": 1,
+                "ช้ากว่าปกติ": 1,
+                "normal": 0,
+                "ปกติ": 0,
             },
-            4: {  # โรคประจำตัว (Chronic disease)
-                "no": 0, "ไม่มี": 0,
-                "yes": 2, "มี": 2
-            },
-
+            4: {"no": 0, "ไม่มี": 0, "yes": 2, "มี": 2},  # โรคประจำตัว (Chronic disease)
             # Dietary Questions (Q5-Q16)
             5: {  # มื้ออาหารต่อวัน (Meals per day)
-                "rarely": 0, "แทบไม่ได้": 0,
-                "1": 1, "1_meal": 1,
-                "2": 2, "2_meals": 2,
-                "3": 3, "3_meals": 3,
-                "more_than_3": 4, ">3": 4
+                "rarely": 0,
+                "แทบไม่ได้": 0,
+                "1": 1,
+                "1_meal": 1,
+                "2": 2,
+                "2_meals": 2,
+                "3": 3,
+                "3_meals": 3,
+                "more_than_3": 4,
+                ">3": 4,
             },
             6: {  # ปริมาณอาหารต่อมื้อ (Portion size)
-                "25%": 0, "25": 0,
-                "50%": 1, "50": 1,
-                "75%": 2, "75": 2,
-                "100%": 3, "100": 3,
-                ">100%": 4, "more_than_100": 4
+                "25%": 0,
+                "25": 0,
+                "50%": 1,
+                "50": 1,
+                "75%": 2,
+                "75": 2,
+                "100%": 3,
+                "100": 3,
+                ">100%": 4,
+                "more_than_100": 4,
             },
             7: {  # ลักษณะอาหาร (Food texture)
-                "liquid": 0, "เหลว": 0,
-                "soft": 2, "อ่อน": 2,
-                "normal": 4, "ปกติ": 4
+                "liquid": 0,
+                "เหลว": 0,
+                "soft": 2,
+                "อ่อน": 2,
+                "normal": 4,
+                "ปกติ": 4,
             },
             8: {  # ข้าว/แป้ง (Rice/starch) - กำปั้น
                 "0": 0,
-                "1-3": 1, "1_to_3": 1,
-                "4-6": 2, "4_to_6": 2,
-                "7-9": 3, "7_to_9": 3,
-                ">9": 4, "more_than_9": 4
+                "1-3": 1,
+                "1_to_3": 1,
+                "4-6": 2,
+                "4_to_6": 2,
+                "7-9": 3,
+                "7_to_9": 3,
+                ">9": 4,
+                "more_than_9": 4,
             },
             9: {  # เนื้อสัตว์ (Protein) - ฝ่ามือ
                 "0": 0,
-                "1-2": 1, "1_to_2": 1,
-                "3-5": 2, "3_to_5": 2,
-                "6-8": 3, "6_to_8": 3,
-                ">8": 4, "more_than_8": 4
+                "1-2": 1,
+                "1_to_2": 1,
+                "3-5": 2,
+                "3_to_5": 2,
+                "6-8": 3,
+                "6_to_8": 3,
+                ">8": 4,
+                "more_than_8": 4,
             },
             10: {  # นม (Milk) - แก้ว
-                "<1": 0, "less_than_1": 0,
+                "<1": 0,
+                "less_than_1": 0,
                 "1": 1,
                 "2": 2,
                 "3": 3,
-                "4": 4
+                "4": 4,
             },
             11: {  # ผลไม้ (Fruits) - กำปั้น
                 "0": 0,
-                "1-2": 1, "1_to_2": 1,
-                "3-5": 2, "3_to_5": 2,
-                "6-8": 3, "6_to_8": 3,
-                ">8": 4, "more_than_8": 4
+                "1-2": 1,
+                "1_to_2": 1,
+                "3-5": 2,
+                "3_to_5": 2,
+                "6-8": 3,
+                "6_to_8": 3,
+                ">8": 4,
+                "more_than_8": 4,
             },
             12: {  # ผัก (Vegetables) - อึงมือ
                 "0": 0,
-                "0-1": 1, "0_to_1": 1,
-                "2-3": 2, "2_to_3": 2,
+                "0-1": 1,
+                "0_to_1": 1,
+                "2-3": 2,
+                "2_to_3": 2,
                 "4": 3,
-                ">4": 4, "more_than_4": 4
+                ">4": 4,
+                "more_than_4": 4,
             },
             13: {  # น้ำเปล่า (Water) - แก้ว
-                "rarely": 0, "แทบไม่ได้": 0,
-                "1-3": 1, "1_to_3": 1,
-                "4-6": 2, "4_to_6": 2,
-                "7-8": 3, "7_to_8": 3,
-                ">8": 4, "more_than_8": 4
+                "rarely": 0,
+                "แทบไม่ได้": 0,
+                "1-3": 1,
+                "1_to_3": 1,
+                "4-6": 2,
+                "4_to_6": 2,
+                "7-8": 3,
+                "7_to_8": 3,
+                ">8": 4,
+                "more_than_8": 4,
             },
             14: {  # เครื่องดื่ม 3in1 (Sweet drinks)
                 "0": 0,
                 "1": 1,
                 "2": 2,
                 "3": 3,
-                ">3": 4, "more_than_3": 4
+                ">3": 4,
+                "more_than_3": 4,
             },
             15: {  # วิธีปรุง (Cooking method)
-                "steam_boil": 0, "ต้ม_นึ่ง": 0, "no_coconut": 0,
-                "stir_fry": 1, "ผัด": 1,
-                "coconut_curry": 2, "แกงกะทิ": 2,
-                "fried": 4, "ทอด": 4
+                "steam_boil": 0,
+                "ต้ม_นึ่ง": 0,
+                "ต้ม/นึ่ง": 0,
+                "no_coconut": 0,
+                "stir_fry": 1,
+                "ผัด": 1,
+                "coconut_curry": 2,
+                "แกงกะทิ": 2,
+                "fried": 4,
+                "ทอด": 4,
             },
             16: {  # น้ำมัน/กะทิ (Oil/coconut milk) - นิ้วหัวแม่มือ
                 "0": 0,
-                "1-2": 1, "1_to_2": 1,
-                "3-4": 2, "3_to_4": 2,
-                "5-6": 3, "5_to_6": 3,
-                ">6": 4, "more_than_6": 4
-            }
+                "1-2": 1,
+                "1_to_2": 1,
+                "3-4": 2,
+                "3_to_4": 2,
+                "5-6": 3,
+                "5_to_6": 3,
+                ">6": 4,
+                "more_than_6": 4,
+            },
         }
 
         if question_num not in scoring_map:
-            return Decimal('0')
+            return Decimal("0")
 
         score = scoring_map[question_num].get(answer_value, 0)
         return Decimal(str(score))
@@ -185,7 +251,7 @@ class ScoringService:
     def calculate_sansa_scores(
         self,
         sansa_response,  # Can be SANSAResponse model or SANSAResponseCreate schema
-        version_id: Optional[int] = None
+        version_id: Optional[int] = None,
     ) -> Dict:
         """
         Calculate SANSA screening, dietary, and total scores from question responses
@@ -204,42 +270,50 @@ class ScoringService:
         scores = {}
 
         # Screening questions (Q1-Q4)
-        q1_score = self.calculate_sansa_question_score(1, sansa_response.q1_weight_change or "")
-        q2_score = self.calculate_sansa_question_score(2, sansa_response.q2_food_intake or "")
-        q3_score = self.calculate_sansa_question_score(3, sansa_response.q3_daily_activities or "")
-        q4_score = self.calculate_sansa_question_score(4, sansa_response.q4_chronic_disease or "")
+        q1_score = self.calculate_sansa_question_score(
+            1, sansa_response.q1_weight_change or ""
+        )
+        q2_score = self.calculate_sansa_question_score(
+            2, sansa_response.q2_food_intake or ""
+        )
+        q3_score = self.calculate_sansa_question_score(
+            3, sansa_response.q3_daily_activities or ""
+        )
+        q4_score = self.calculate_sansa_question_score(
+            4, sansa_response.q4_chronic_disease or ""
+        )
 
-        scores['q1_score'] = q1_score
-        scores['q2_score'] = q2_score
-        scores['q3_score'] = q3_score
-        scores['q4_score'] = q4_score
+        scores["q1_score"] = q1_score
+        scores["q2_score"] = q2_score
+        scores["q3_score"] = q3_score
+        scores["q4_score"] = q4_score
 
         screening_total = q1_score + q2_score + q3_score + q4_score
 
         # Dietary questions (Q5-Q16)
-        diet_total = Decimal('0')
+        diet_total = Decimal("0")
         for q_num in range(5, 17):
             q_field = f"q{q_num}_"
             # Get question answer based on field name
             question_field_map = {
-                5: 'meals_per_day',
-                6: 'portion_size',
-                7: 'food_texture',
-                8: 'rice_grains',
-                9: 'protein_legumes',
-                10: 'milk_yogurt',
-                11: 'fruits',
-                12: 'vegetables',
-                13: 'water_intake',
-                14: 'sweet_drinks',
-                15: 'cooking_method',
-                16: 'oil_coconut'
+                5: "meals_per_day",
+                6: "portion_size",
+                7: "food_texture",
+                8: "rice_starch",
+                9: "protein",
+                10: "milk",
+                11: "fruits",
+                12: "vegetables",
+                13: "water",
+                14: "sweet_drinks",
+                15: "cooking_method",
+                16: "oil_coconut",
             }
 
             field_name = f"q{q_num}_{question_field_map[q_num]}"
             answer_value = getattr(sansa_response, field_name, None) or ""
             q_score = self.calculate_sansa_question_score(q_num, answer_value)
-            scores[f'q{q_num}_score'] = q_score
+            scores[f"q{q_num}_score"] = q_score
             diet_total += q_score
 
         # Calculate overall total score
@@ -260,10 +334,12 @@ class ScoringService:
             "diet_total": diet_total,
             "total_score": total_score,
             "result_level": result_level,
-            "scoring_version_id": version_id
+            "scoring_version_id": version_id,
         }
 
-    def calculate_mna_question_score(self, question_num: int, answer_value: str) -> Decimal:
+    def calculate_mna_question_score(
+        self, question_num: int, answer_value: str
+    ) -> Decimal:
         """
         Calculate score for a single MNA question based on answer
 
@@ -296,11 +372,11 @@ class ScoringService:
             15: {"0": 0, "1": 1, "2": 2},
             16: {"0": 0, "1": 1, "2": 2},
             17: {"0": 0, "0.5": 0.5, "1": 1, "2": 2},
-            18: {"0": 0, "0.5": 0.5, "1": 1}
+            18: {"0": 0, "0.5": 0.5, "1": 1},
         }
 
         if question_num not in scoring_map:
-            return Decimal('0')
+            return Decimal("0")
 
         score = scoring_map[question_num].get(answer_value, 0)
         return Decimal(str(score))
@@ -308,7 +384,7 @@ class ScoringService:
     def calculate_mna_score(
         self,
         mna_response,  # Can be MNAResponse model or MNAResponseCreate schema
-        version_id: Optional[int] = None
+        version_id: Optional[int] = None,
     ) -> Dict:
         """
         Calculate MNA screening, assessment, and total score from question responses
@@ -325,27 +401,27 @@ class ScoringService:
 
         # Calculate scores for screening questions (Q1-Q7)
         scores = {}
-        screening_total = Decimal('0')
+        screening_total = Decimal("0")
 
         question_field_map = {
-            1: 'food_intake_decline',
-            2: 'weight_loss',
-            3: 'mobility',
-            4: 'psychological_stress',
-            5: 'neuropsychological_problems',
-            6: 'bmi_or_calf',
-            7: 'independent_living',
-            8: 'medications',
-            9: 'pressure_ulcers',
-            10: 'meals_per_day',
-            11: 'protein_markers',
-            12: 'fruits_vegetables',
-            13: 'fluid_intake',
-            14: 'feeding_ability',
-            15: 'self_nutrition_view',
-            16: 'health_comparison',
-            17: 'mid_arm_circumference',
-            18: 'calf_circumference'
+            1: "food_intake_decline",
+            2: "weight_loss",
+            3: "mobility",
+            4: "psychological_stress",
+            5: "neuropsychological_problems",
+            6: "bmi_or_calf",
+            7: "independent_living",
+            8: "medications",
+            9: "pressure_ulcers",
+            10: "meals_per_day",
+            11: "protein_markers",
+            12: "fruits_vegetables",
+            13: "fluid_intake",
+            14: "feeding_ability",
+            15: "self_nutrition_view",
+            16: "health_comparison",
+            17: "mid_arm_circumference",
+            18: "calf_circumference",
         }
 
         # Calculate screening (Q1-Q7)
@@ -353,22 +429,22 @@ class ScoringService:
             field_name = f"q{q_num}_{question_field_map[q_num]}"
             answer_value = getattr(mna_response, field_name, None) or ""
             q_score = self.calculate_mna_question_score(q_num, answer_value)
-            scores[f'q{q_num}_score'] = q_score
+            scores[f"q{q_num}_score"] = q_score
             screening_total += q_score
 
         # Calculate assessment (Q8-Q18) - only if screening ≤11
-        assessment_total = Decimal('0')
+        assessment_total = Decimal("0")
         if screening_total <= 11:
             for q_num in range(8, 19):
                 field_name = f"q{q_num}_{question_field_map[q_num]}"
                 answer_value = getattr(mna_response, field_name, None) or ""
                 q_score = self.calculate_mna_question_score(q_num, answer_value)
-                scores[f'q{q_num}_score'] = q_score
+                scores[f"q{q_num}_score"] = q_score
                 assessment_total += q_score
         else:
             # If screening > 11, skip assessment (normal nutritional status)
             for q_num in range(8, 19):
-                scores[f'q{q_num}_score'] = Decimal('0')
+                scores[f"q{q_num}_score"] = Decimal("0")
 
         # Calculate total score
         total_score = screening_total + assessment_total
@@ -388,7 +464,7 @@ class ScoringService:
             "assessment_total": assessment_total,
             "total_score": total_score,
             "result_category": result_category,
-            "scoring_version_id": version_id
+            "scoring_version_id": version_id,
         }
 
     def calculate_bmi(self, weight_kg: Decimal, height_cm: Decimal) -> Decimal:
@@ -422,9 +498,7 @@ class ScoringService:
             return "obese_2"
 
     def calculate_waist_hip_ratio(
-        self,
-        waist_cm: Decimal,
-        hip_cm: Decimal
+        self, waist_cm: Decimal, hip_cm: Decimal
     ) -> Optional[Decimal]:
         """Calculate waist-to-hip ratio"""
         if waist_cm and hip_cm and hip_cm > 0:
