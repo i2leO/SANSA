@@ -16,18 +16,18 @@ def export_sansa(
     end_date: Optional[date] = None,
     facility_id: Optional[int] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_staff_or_admin)
+    current_user: User = Depends(get_current_staff_or_admin),
 ):
     """Export SANSA data to CSV (SPSS format)"""
     export_service = ExportService(db)
     csv_content = export_service.export_sansa_csv(start_date, end_date, facility_id)
-    
+
     return Response(
         content=csv_content,
         media_type="text/csv",
         headers={
             "Content-Disposition": f"attachment; filename=sansa_export_{date.today().isoformat()}.csv"
-        }
+        },
     )
 
 
@@ -36,18 +36,18 @@ def export_mna(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_staff_or_admin)
+    current_user: User = Depends(get_current_staff_or_admin),
 ):
     """Export MNA data to CSV (SPSS format)"""
     export_service = ExportService(db)
     csv_content = export_service.export_mna_csv(start_date, end_date)
-    
+
     return Response(
         content=csv_content,
         media_type="text/csv",
         headers={
             "Content-Disposition": f"attachment; filename=mna_export_{date.today().isoformat()}.csv"
-        }
+        },
     )
 
 
@@ -56,18 +56,38 @@ def export_bia(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_staff_or_admin)
+    current_user: User = Depends(get_current_staff_or_admin),
 ):
     """Export BIA/anthropometry data to CSV (SPSS format)"""
     export_service = ExportService(db)
     csv_content = export_service.export_bia_csv(start_date, end_date)
-    
+
     return Response(
         content=csv_content,
         media_type="text/csv",
         headers={
             "Content-Disposition": f"attachment; filename=bia_export_{date.today().isoformat()}.csv"
-        }
+        },
+    )
+
+
+@router.get("/satisfaction.csv")
+def export_satisfaction(
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_staff_or_admin),
+):
+    """Export Satisfaction survey data to CSV (SPSS format)"""
+    export_service = ExportService(db)
+    csv_content = export_service.export_satisfaction_csv(start_date, end_date)
+
+    return Response(
+        content=csv_content,
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f"attachment; filename=satisfaction_export_{date.today().isoformat()}.csv"
+        },
     )
 
 
@@ -76,16 +96,16 @@ def export_combined(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_staff_or_admin)
+    current_user: User = Depends(get_current_staff_or_admin),
 ):
     """Export combined dataset with all instruments"""
     export_service = ExportService(db)
     csv_content = export_service.export_combined_csv(start_date, end_date)
-    
+
     return Response(
         content=csv_content,
         media_type="text/csv",
         headers={
             "Content-Disposition": f"attachment; filename=combined_export_{date.today().isoformat()}.csv"
-        }
+        },
     )

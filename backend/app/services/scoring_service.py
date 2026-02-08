@@ -429,7 +429,7 @@ class ScoringService:
             field_name = f"q{q_num}_{question_field_map[q_num]}"
             answer_value = getattr(mna_response, field_name, None) or ""
             q_score = self.calculate_mna_question_score(q_num, answer_value)
-            scores[f"q{q_num}_score"] = q_score
+            scores[f"mna_s{q_num}"] = q_score
             screening_total += q_score
 
         # Calculate assessment (Q8-Q18) - only if screening ≤11
@@ -439,12 +439,12 @@ class ScoringService:
                 field_name = f"q{q_num}_{question_field_map[q_num]}"
                 answer_value = getattr(mna_response, field_name, None) or ""
                 q_score = self.calculate_mna_question_score(q_num, answer_value)
-                scores[f"q{q_num}_score"] = q_score
+                scores[f"mna_a{q_num - 7}"] = q_score
                 assessment_total += q_score
         else:
             # If screening > 11, skip assessment (normal nutritional status)
             for q_num in range(8, 19):
-                scores[f"q{q_num}_score"] = Decimal("0")
+                scores[f"mna_a{q_num - 7}"] = Decimal("0")
 
         # Calculate total score
         total_score = screening_total + assessment_total
@@ -460,9 +460,9 @@ class ScoringService:
 
         return {
             **scores,  # Include all individual question scores
-            "screening_total": screening_total,
-            "assessment_total": assessment_total,
-            "total_score": total_score,
+            "mna_screen_total": screening_total,
+            "mna_ass_total": assessment_total,
+            "mna_total": total_score,
             "result_category": result_category,
             "scoring_version_id": version_id,
         }

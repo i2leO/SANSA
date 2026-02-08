@@ -52,46 +52,46 @@ def create_mna_response(mna_create: MNAResponseCreate, db: Session = Depends(get
         scoring_version_id=1,  # Default to version 1
         # Screening questions (Q1-Q7) - always required
         q1_food_intake_decline=mna_create.q1_food_intake_decline,
-        q1_score=scores.get("q1_score"),
+        mna_s1=scores.get("mna_s1"),
         q2_weight_loss=mna_create.q2_weight_loss,
-        q2_score=scores.get("q2_score"),
+        mna_s2=scores.get("mna_s2"),
         q3_mobility=mna_create.q3_mobility,
-        q3_score=scores.get("q3_score"),
+        mna_s3=scores.get("mna_s3"),
         q4_psychological_stress=mna_create.q4_psychological_stress,
-        q4_score=scores.get("q4_score"),
+        mna_s4=scores.get("mna_s4"),
         q5_neuropsychological_problems=mna_create.q5_neuropsychological_problems,
-        q5_score=scores.get("q5_score"),
+        mna_s5=scores.get("mna_s5"),
         q6_bmi_or_calf=mna_create.q6_bmi_or_calf,
-        q6_score=scores.get("q6_score"),
+        mna_s6=scores.get("mna_s6"),
         q7_independent_living=mna_create.q7_independent_living,
-        q7_score=scores.get("q7_score"),
+        mna_s7=scores.get("mna_s7"),
         # Assessment questions (Q8-Q18) - only if screening ≤11
         q8_medications=mna_create.q8_medications,
-        q8_score=scores.get("q8_score"),
+        mna_a1=scores.get("mna_a1"),
         q9_pressure_ulcers=mna_create.q9_pressure_ulcers,
-        q9_score=scores.get("q9_score"),
+        mna_a2=scores.get("mna_a2"),
         q10_meals_per_day=mna_create.q10_meals_per_day,
-        q10_score=scores.get("q10_score"),
+        mna_a3=scores.get("mna_a3"),
         q11_protein_markers=mna_create.q11_protein_markers,
-        q11_score=scores.get("q11_score"),
+        mna_a4=scores.get("mna_a4"),
         q12_fruits_vegetables=mna_create.q12_fruits_vegetables,
-        q12_score=scores.get("q12_score"),
+        mna_a5=scores.get("mna_a5"),
         q13_fluid_intake=mna_create.q13_fluid_intake,
-        q13_score=scores.get("q13_score"),
+        mna_a6=scores.get("mna_a6"),
         q14_feeding_ability=mna_create.q14_feeding_ability,
-        q14_score=scores.get("q14_score"),
+        mna_a7=scores.get("mna_a7"),
         q15_self_nutrition_view=mna_create.q15_self_nutrition_view,
-        q15_score=scores.get("q15_score"),
+        mna_a8=scores.get("mna_a8"),
         q16_health_comparison=mna_create.q16_health_comparison,
-        q16_score=scores.get("q16_score"),
+        mna_a9=scores.get("mna_a9"),
         q17_mid_arm_circumference=mna_create.q17_mid_arm_circumference,
-        q17_score=scores.get("q17_score"),
+        mna_a10=scores.get("mna_a10"),
         q18_calf_circumference=mna_create.q18_calf_circumference,
-        q18_score=scores.get("q18_score"),
+        mna_a11=scores.get("mna_a11"),
         # Totals
-        screening_total=scores["screening_total"],
-        assessment_total=scores.get("assessment_total", 0),
-        total_score=scores["total_score"],
+        mna_screen_total=scores["mna_screen_total"],
+        mna_ass_total=scores.get("mna_ass_total", 0),
+        mna_total=scores["mna_total"],
         result_category=scores["result_category"],
         completed_at=datetime.utcnow(),
     )
@@ -196,15 +196,20 @@ def update_mna_response(
         if not field.endswith("_score"):  # Don't manually set scores
             setattr(mna_response, field, value)
 
-    # Update scores
-    for q_num in range(1, 19):
-        score_field = f"q{q_num}_score"
+    # Update scores (Q1-Q7 use mna_s1-mna_s7, Q8-Q18 use mna_a1-mna_a11)
+    for q_num in range(1, 8):
+        score_field = f\"mna_s{q_num}\"
         if score_field in scores:
             setattr(mna_response, score_field, scores[score_field])
 
-    mna_response.screening_total = scores["screening_total"]
-    mna_response.assessment_total = scores.get("assessment_total", 0)
-    mna_response.total_score = scores["total_score"]
+    for q_num in range(8, 19):
+        score_field = f\"mna_a{q_num - 7}\"
+        if score_field in scores:
+            setattr(mna_response, score_field, scores[score_field])
+
+    mna_response.mna_screen_total = scores[\"mna_screen_total\"]
+    mna_response.mna_ass_total = scores.get(\"mna_ass_total\", 0)
+    mna_response.mna_total = scores[\"mna_total\"]
     mna_response.result_category = scores["result_category"]
 
     db.commit()
@@ -264,16 +269,16 @@ def get_mna_advice(mna_response_id: int, db: Session = Depends(get_db)):
     return {
         "result_category": mna_response.result_category,
         "total_score": (
-            float(mna_response.total_score) if mna_response.total_score else None
+            float(mna_response.mna_total) if mna_response.mna_total else None
         ),
         "screening_total": (
-            float(mna_response.screening_total)
-            if mna_response.screening_total
+            float(mna_response.mna_screen_total)
+            if mna_response.mna_screen_total
             else None
         ),
         "assessment_total": (
-            float(mna_response.assessment_total)
-            if mna_response.assessment_total
+            float(mna_response.mna_ass_total)
+            if mna_response.mna_ass_total
             else None
         ),
         "advice_text_th": advice["th"],

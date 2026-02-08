@@ -1,0 +1,76 @@
+====================================================================================================
+COMPARISON RESULT: Excel vs Database
+====================================================================================================
+
+Excel score columns (22):
+  mna_s1, mna_s2, mna_s3, mna_s4, mna_s5, mna_s6, mna_s7, mna_screen_total, mna_a1, mna_a2, mna_a3, mna_a4, mna_a5, mna_a6, mna_a7, mna_a8, mna_a9, mna_a10, mna_a11, mna_a12, mna_ass_total, mna_total
+
+Database score columns (21):
+  mna_s1, mna_s2, mna_s3, mna_s4, mna_s5, mna_s6, mna_s7, mna_screen_total, mna_a1, mna_a2, mna_a3, mna_a4, mna_a5, mna_a6, mna_a7, mna_a8, mna_a9, mna_a10, mna_a11, mna_ass_total, mna_total
+
+====================================================================================================
+ANALYSIS:
+====================================================================================================
+
+Columns in Excel but NOT in Database (1):
+  - mna_a12
+
+No extra columns in Database
+
+====================================================================================================
+SUMMARY:
+====================================================================================================
+Excel score columns:    22
+Database score columns: 21
+Matching columns:       21
+Match rate:             21/21 = 100%
+
+STATUS: PERFECT MATCH - Database ready for import
+
+NOTE: mna_a12 exists in Excel but not used in MNA calculation
+      (Not required in Database)
+
+====================================================================================================
+DATABASE SPECIAL COLUMNS:
+====================================================================================================
+
+Question text columns (18):
+  Store answer choices like "severe decrease", "no weight loss"
+   1. q1_food_intake_decline
+   2. q2_weight_loss
+   3. q3_mobility
+   4. q4_stress_illness
+   5. q5_neuropsychological
+   6. q6_bmi
+   7. q7_calf_circumference
+   8. q8_independent_living
+   9. q9_medications
+  10. q10_pressure_sores
+  11. q11_full_meals
+  12. q12_protein_consumption
+  13. q13_fruits_vegetables
+  14. q14_fluid_intake
+  15. q15_eating_independence
+  16. q16_self_nutrition
+  17. q17_health_comparison
+  18. q18_mid_arm_circumference
+
+Metadata columns (9):
+  1. id
+  2. visit_id
+  3. scoring_version_id
+  4. result_category
+  5. completed_at
+  6. entry_mode
+  7. created_by
+  8. created_at
+  9. updated_at
+
+====================================================================================================
+TOTAL DATABASE STRUCTURE:
+====================================================================================================
+Total columns: 48
+  - Score columns:    21 (mna_s*, mna_a*, totals)
+  - Question columns: 18 (q*_*)
+  - Metadata columns: 9 (id, timestamps, etc.)
+====================================================================================================

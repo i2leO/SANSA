@@ -362,45 +362,45 @@ class MNAResponseFull(BaseModel):
     scoring_version_id: int
     # All 18 questions with scores
     q1_food_intake_decline: Optional[str]
-    q1_score: Optional[Decimal]
+    mna_s1: Optional[Decimal]
     q2_weight_loss: Optional[str]
-    q2_score: Optional[Decimal]
+    mna_s2: Optional[Decimal]
     q3_mobility: Optional[str]
-    q3_score: Optional[Decimal]
+    mna_s3: Optional[Decimal]
     q4_stress_illness: Optional[str]
-    q4_score: Optional[Decimal]
+    mna_s4: Optional[Decimal]
     q5_neuropsychological: Optional[str]
-    q5_score: Optional[Decimal]
+    mna_s5: Optional[Decimal]
     q6_bmi: Optional[str]
-    q6_score: Optional[Decimal]
+    mna_s6: Optional[Decimal]
     q7_calf_circumference: Optional[str]
-    q7_score: Optional[Decimal]
+    mna_s7: Optional[Decimal]
     q8_independent_living: Optional[str]
-    q8_score: Optional[Decimal]
+    mna_a1: Optional[Decimal]
     q9_medications: Optional[str]
-    q9_score: Optional[Decimal]
+    mna_a2: Optional[Decimal]
     q10_pressure_sores: Optional[str]
-    q10_score: Optional[Decimal]
+    mna_a3: Optional[Decimal]
     q11_full_meals: Optional[str]
-    q11_score: Optional[Decimal]
+    mna_a4: Optional[Decimal]
     q12_protein_consumption: Optional[str]
-    q12_score: Optional[Decimal]
+    mna_a5: Optional[Decimal]
     q13_fruits_vegetables: Optional[str]
-    q13_score: Optional[Decimal]
+    mna_a6: Optional[Decimal]
     q14_fluid_intake: Optional[str]
-    q14_score: Optional[Decimal]
+    mna_a7: Optional[Decimal]
     q15_eating_independence: Optional[str]
-    q15_score: Optional[Decimal]
+    mna_a8: Optional[Decimal]
     q16_self_nutrition: Optional[str]
-    q16_score: Optional[Decimal]
+    mna_a9: Optional[Decimal]
     q17_health_comparison: Optional[str]
-    q17_score: Optional[Decimal]
+    mna_a10: Optional[Decimal]
     q18_mid_arm_circumference: Optional[str]
-    q18_score: Optional[Decimal]
+    mna_a11: Optional[Decimal]
     # Totals
-    screening_total: Optional[Decimal]
-    assessment_total: Optional[Decimal]
-    total_score: Optional[Decimal]
+    mna_screen_total: Optional[Decimal]
+    mna_ass_total: Optional[Decimal]
+    mna_total: Optional[Decimal]
     result_category: Optional[str]
     completed_at: Optional[datetime]
     entry_mode: Optional[str]
@@ -493,7 +493,9 @@ class MNAItemInput(BaseModel):
     item_score: Decimal
 
 
-class MNAResponseCreate(BaseModel):
+class MNAResponseCreateV2(BaseModel):
+    """Alternative MNA response schema using item list format"""
+
     visit_id: int
     entry_mode: EntryMode = EntryMode.STAFF
     items: List[MNAItemInput]
@@ -509,11 +511,13 @@ class MNAItemResponse(BaseModel):
         from_attributes = True
 
 
-class MNAResponseFull(BaseModel):
+class MNAResponseFullV2(BaseModel):
+    """Alternative MNA response schema using item list format"""
+
     id: int
     visit_id: int
     scoring_version_id: int
-    total_score: Optional[Decimal]
+    mna_total: Optional[Decimal]
     result_category: Optional[str]
     entry_mode: str
     completed_at: Optional[datetime]

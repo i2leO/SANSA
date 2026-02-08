@@ -53,73 +53,134 @@ class ExportService:
 
         # Write header
         header = [
+            # Respondent demographics (expanded)
             "respondent_code",
             "respondent_id",
-            "visit_id",
-            "visit_number",
-            "visit_date",
+            "status",
             "age",
             "sex",
             "education_level",
-            "income_range",
-            "sansa_q1",
-            "sansa_q2",
-            "sansa_q3",
-            "sansa_q4",
-            "sansa_d01",
-            "sansa_d02",
-            "sansa_d03",
-            "sansa_d04",
-            "sansa_d05",
-            "sansa_d06",
-            "sansa_d07",
-            "sansa_d08",
-            "sansa_d09",
-            "sansa_d10",
-            "sansa_d11",
-            "sansa_d12",
+            "marital_status",
+            "monthly_income",
+            "income_sources",
+            "chronic_diseases",
+            "living_arrangement",
+            # Visit information
+            "visit_id",
+            "visit_number",
+            "visit_date",
+            # SANSA screening questions & scores (Q1-Q4)
+            "sansa_q1_answer",
+            "sansa_q1_score",
+            "sansa_q2_answer",
+            "sansa_q2_score",
+            "sansa_q3_answer",
+            "sansa_q3_score",
+            "sansa_q4_answer",
+            "sansa_q4_score",
+            # SANSA dietary questions & scores (Q5-Q16)
+            "sansa_q5_answer",
+            "sansa_q5_score",
+            "sansa_q6_answer",
+            "sansa_q6_score",
+            "sansa_q7_answer",
+            "sansa_q7_score",
+            "sansa_q8_answer",
+            "sansa_q8_score",
+            "sansa_q9_answer",
+            "sansa_q9_score",
+            "sansa_q10_answer",
+            "sansa_q10_score",
+            "sansa_q11_answer",
+            "sansa_q11_score",
+            "sansa_q12_answer",
+            "sansa_q12_score",
+            "sansa_q13_answer",
+            "sansa_q13_score",
+            "sansa_q14_answer",
+            "sansa_q14_score",
+            "sansa_q15_answer",
+            "sansa_q15_score",
+            "sansa_q16_answer",
+            "sansa_q16_score",
+            # SANSA totals
             "sansa_screening_total",
             "sansa_diet_total",
             "sansa_total",
             "sansa_level",
             "sansa_version",
-            "completed_at",
-            "created_at",
+            "sansa_completed_at",
         ]
         writer.writerow(header)
 
         # Write data rows
         for respondent, visit, sansa_response in results:
-            # Use columns from SANSAResponse directly
+            # Prepare JSON fields
+            import json
+
+            income_sources = (
+                json.dumps(respondent.income_sources)
+                if respondent.income_sources
+                else ""
+            )
+            chronic_diseases = (
+                json.dumps(respondent.chronic_diseases)
+                if respondent.chronic_diseases
+                else ""
+            )
+
             row = [
+                # Respondent demographics (expanded)
                 respondent.respondent_code,
                 respondent.id,
+                respondent.status or "",
+                respondent.age or "",
+                self._encode_sex(respondent.sex),
+                respondent.education_level or "",
+                respondent.marital_status or "",
+                respondent.monthly_income or "",
+                income_sources,
+                chronic_diseases,
+                respondent.living_arrangement or "",
+                # Visit information
                 visit.id,
                 visit.visit_number,
                 visit.visit_date.isoformat() if visit.visit_date else "",
-                respondent.age,
-                self._encode_sex(respondent.sex),
-                respondent.education_level or "",
-                respondent.income_range or "",
-                # Screening items (q1-q4 scores)
+                # SANSA screening questions & scores (Q1-Q4)
+                sansa_response.q1_weight_change or "",
                 float(sansa_response.q1_score) if sansa_response.q1_score else "",
+                sansa_response.q2_food_intake or "",
                 float(sansa_response.q2_score) if sansa_response.q2_score else "",
+                sansa_response.q3_daily_activities or "",
                 float(sansa_response.q3_score) if sansa_response.q3_score else "",
+                sansa_response.q4_chronic_disease or "",
                 float(sansa_response.q4_score) if sansa_response.q4_score else "",
-                # Dietary items (q5-q16 scores)
+                # SANSA dietary questions & scores (Q5-Q16)
+                sansa_response.q5_meals_per_day or "",
                 float(sansa_response.q5_score) if sansa_response.q5_score else "",
+                sansa_response.q6_portion_size or "",
                 float(sansa_response.q6_score) if sansa_response.q6_score else "",
+                sansa_response.q7_food_texture or "",
                 float(sansa_response.q7_score) if sansa_response.q7_score else "",
+                sansa_response.q8_rice_starch or "",
                 float(sansa_response.q8_score) if sansa_response.q8_score else "",
+                sansa_response.q9_protein or "",
                 float(sansa_response.q9_score) if sansa_response.q9_score else "",
+                sansa_response.q10_milk or "",
                 float(sansa_response.q10_score) if sansa_response.q10_score else "",
+                sansa_response.q11_fruits or "",
                 float(sansa_response.q11_score) if sansa_response.q11_score else "",
+                sansa_response.q12_vegetables or "",
                 float(sansa_response.q12_score) if sansa_response.q12_score else "",
+                sansa_response.q13_water or "",
                 float(sansa_response.q13_score) if sansa_response.q13_score else "",
+                sansa_response.q14_sweet_drinks or "",
                 float(sansa_response.q14_score) if sansa_response.q14_score else "",
+                sansa_response.q15_cooking_method or "",
                 float(sansa_response.q15_score) if sansa_response.q15_score else "",
+                sansa_response.q16_oil_coconut or "",
                 float(sansa_response.q16_score) if sansa_response.q16_score else "",
-                # Totals
+                # SANSA totals
                 (
                     float(sansa_response.screening_total)
                     if sansa_response.screening_total
@@ -132,11 +193,6 @@ class ExportService:
                 (
                     sansa_response.completed_at.isoformat()
                     if sansa_response.completed_at
-                    else ""
-                ),
-                (
-                    sansa_response.created_at.isoformat()
-                    if sansa_response.created_at
                     else ""
                 ),
             ]
@@ -166,41 +222,122 @@ class ExportService:
         output = io.StringIO()
         writer = csv.writer(output)
 
-        # Header with MNA items (assuming 18 items)
-        header = (
-            ["respondent_code", "visit_id", "visit_date"]
-            + [f"mna_q{i:02d}" for i in range(1, 19)]
-            + ["mna_total", "mna_category", "entry_mode", "completed_at"]
-        )
+        # Header with MNA items (18 questions with answers and scores)
+        header = [
+            "respondent_code",
+            "visit_id",
+            "visit_date",
+            # Screening section (Q1-Q7)
+            "mna_q1_answer",
+            "mna_q1_score",
+            "mna_q2_answer",
+            "mna_q2_score",
+            "mna_q3_answer",
+            "mna_q3_score",
+            "mna_q4_answer",
+            "mna_q4_score",
+            "mna_q5_answer",
+            "mna_q5_score",
+            "mna_q6_answer",
+            "mna_q6_score",
+            "mna_q7_answer",
+            "mna_q7_score",
+            "mna_screening_total",
+            # Assessment section (Q8-Q18)
+            "mna_q8_answer",
+            "mna_q8_score",
+            "mna_q9_answer",
+            "mna_q9_score",
+            "mna_q10_answer",
+            "mna_q10_score",
+            "mna_q11_answer",
+            "mna_q11_score",
+            "mna_q12_answer",
+            "mna_q12_score",
+            "mna_q13_answer",
+            "mna_q13_score",
+            "mna_q14_answer",
+            "mna_q14_score",
+            "mna_q15_answer",
+            "mna_q15_score",
+            "mna_q16_answer",
+            "mna_q16_score",
+            "mna_q17_answer",
+            "mna_q17_score",
+            "mna_q18_answer",
+            "mna_q18_score",
+            "mna_assessment_total",
+            # Totals
+            "mna_total",
+            "mna_category",
+            "entry_mode",
+            "completed_at",
+        ]
         writer.writerow(header)
 
         for respondent, visit, mna_response in results:
-            # Use columns from MNAResponse directly (q1-q18 scores)
-            row = (
-                [
-                    respondent.respondent_code,
-                    visit.id,
-                    visit.visit_date.isoformat() if visit.visit_date else "",
-                ]
-                + [
-                    (
-                        float(getattr(mna_response, f"q{i}_score"))
-                        if getattr(mna_response, f"q{i}_score")
-                        else ""
-                    )
-                    for i in range(1, 19)
-                ]
-                + [
-                    float(mna_response.total_score) if mna_response.total_score else "",
-                    self._encode_mna_category(mna_response.result_category),
-                    mna_response.entry_mode or "",
-                    (
-                        mna_response.completed_at.isoformat()
-                        if mna_response.completed_at
-                        else ""
-                    ),
-                ]
-            )
+            row = [
+                respondent.respondent_code,
+                visit.id,
+                visit.visit_date.isoformat() if visit.visit_date else "",
+                # Screening section (Q1-Q7)
+                mna_response.q1_food_intake_decline or "",
+                float(mna_response.mna_s1) if mna_response.mna_s1 else "",
+                mna_response.q2_weight_loss or "",
+                float(mna_response.mna_s2) if mna_response.mna_s2 else "",
+                mna_response.q3_mobility or "",
+                float(mna_response.mna_s3) if mna_response.mna_s3 else "",
+                mna_response.q4_stress_illness or "",
+                float(mna_response.mna_s4) if mna_response.mna_s4 else "",
+                mna_response.q5_neuropsychological or "",
+                float(mna_response.mna_s5) if mna_response.mna_s5 else "",
+                mna_response.q6_bmi or "",
+                float(mna_response.mna_s6) if mna_response.mna_s6 else "",
+                mna_response.q7_calf_circumference or "",
+                float(mna_response.mna_s7) if mna_response.mna_s7 else "",
+                (
+                    float(mna_response.mna_screen_total)
+                    if mna_response.mna_screen_total
+                    else ""
+                ),
+                # Assessment section (Q8-Q18)
+                mna_response.q8_independent_living or "",
+                float(mna_response.mna_a1) if mna_response.mna_a1 else "",
+                mna_response.q9_medications or "",
+                float(mna_response.mna_a2) if mna_response.mna_a2 else "",
+                mna_response.q10_pressure_sores or "",
+                float(mna_response.mna_a3) if mna_response.mna_a3 else "",
+                mna_response.q11_full_meals or "",
+                float(mna_response.mna_a4) if mna_response.mna_a4 else "",
+                mna_response.q12_protein_consumption or "",
+                float(mna_response.mna_a5) if mna_response.mna_a5 else "",
+                mna_response.q13_fruits_vegetables or "",
+                float(mna_response.mna_a6) if mna_response.mna_a6 else "",
+                mna_response.q14_fluid_intake or "",
+                float(mna_response.mna_a7) if mna_response.mna_a7 else "",
+                mna_response.q15_eating_independence or "",
+                float(mna_response.mna_a8) if mna_response.mna_a8 else "",
+                mna_response.q16_self_nutrition or "",
+                float(mna_response.mna_a9) if mna_response.mna_a9 else "",
+                mna_response.q17_health_comparison or "",
+                float(mna_response.mna_a10) if mna_response.mna_a10 else "",
+                mna_response.q18_mid_arm_circumference or "",
+                float(mna_response.mna_a11) if mna_response.mna_a11 else "",
+                (
+                    float(mna_response.mna_ass_total)
+                    if mna_response.mna_ass_total
+                    else ""
+                ),
+                # Totals
+                float(mna_response.mna_total) if mna_response.mna_total else "",
+                self._encode_mna_category(mna_response.result_category),
+                mna_response.entry_mode or "",
+                (
+                    mna_response.completed_at.isoformat()
+                    if mna_response.completed_at
+                    else ""
+                ),
+            ]
             writer.writerow(row)
 
         return output.getvalue()
@@ -231,18 +368,31 @@ class ExportService:
             "respondent_code",
             "visit_id",
             "visit_date",
-            "bia_weight",
-            "bia_height",
+            # Basic info
+            "bia_age",
+            "bia_sex",
+            # Basic measurements
+            "bia_weight_kg",
+            "bia_height_cm",
             "bia_bmi",
-            "bia_body_fat_pct",
-            "bia_muscle_kg",
-            "bia_bone_kg",
-            "bia_water_pct",
-            "bia_visceral_fat",
+            "bia_bmi_category",
             "bia_waist_cm",
             "bia_hip_cm",
             "bia_waist_hip_ratio",
-            "measured_at",
+            # Body composition
+            "bia_fat_mass_kg",
+            "bia_body_fat_pct",
+            "bia_visceral_fat_kg",
+            "bia_muscle_mass_kg",
+            "bia_bone_mass_kg",
+            "bia_water_pct",
+            "bia_metabolic_rate",
+            # Recommendations
+            "bia_weight_management",
+            "bia_food_recommendation",
+            "staff_signature",
+            "measurement_date",
+            "notes",
         ]
         writer.writerow(header)
 
@@ -251,18 +401,92 @@ class ExportService:
                 respondent.respondent_code,
                 visit.id,
                 visit.visit_date.isoformat() if visit.visit_date else "",
+                # Basic info
+                bia.age or "",
+                self._encode_sex(bia.sex),
+                # Basic measurements
                 float(bia.weight_kg) if bia.weight_kg else "",
                 float(bia.height_cm) if bia.height_cm else "",
                 float(bia.bmi) if bia.bmi else "",
-                float(bia.body_fat_percentage) if bia.body_fat_percentage else "",
-                float(bia.muscle_mass_kg) if bia.muscle_mass_kg else "",
-                float(bia.bone_mass_kg) if bia.bone_mass_kg else "",
-                float(bia.water_percentage) if bia.water_percentage else "",
-                bia.visceral_fat_level or "",
+                bia.bmi_category or "",
                 float(bia.waist_circumference_cm) if bia.waist_circumference_cm else "",
                 float(bia.hip_circumference_cm) if bia.hip_circumference_cm else "",
                 float(bia.waist_hip_ratio) if bia.waist_hip_ratio else "",
-                bia.created_at.isoformat() if bia.created_at else "",
+                # Body composition
+                float(bia.fat_mass_kg) if bia.fat_mass_kg else "",
+                float(bia.body_fat_percentage) if bia.body_fat_percentage else "",
+                float(bia.visceral_fat_kg) if bia.visceral_fat_kg else "",
+                float(bia.muscle_mass_kg) if bia.muscle_mass_kg else "",
+                float(bia.bone_mass_kg) if bia.bone_mass_kg else "",
+                float(bia.water_percentage) if bia.water_percentage else "",
+                bia.metabolic_rate or "",
+                # Recommendations
+                bia.weight_management or "",
+                bia.food_recommendation or "",
+                bia.staff_signature or "",
+                bia.measurement_date.isoformat() if bia.measurement_date else "",
+                bia.notes or "",
+            ]
+            writer.writerow(row)
+
+        return output.getvalue()
+
+    def export_satisfaction_csv(
+        self, start_date: Optional[date] = None, end_date: Optional[date] = None
+    ) -> str:
+        """Export Satisfaction survey data to CSV"""
+
+        query = (
+            self.db.query(Respondent, Visit, SatisfactionResponse)
+            .join(Visit, Visit.respondent_id == Respondent.id)
+            .join(SatisfactionResponse, SatisfactionResponse.visit_id == Visit.id)
+        )
+
+        if start_date:
+            query = query.filter(Visit.visit_date >= start_date)
+        if end_date:
+            query = query.filter(Visit.visit_date <= end_date)
+
+        query = query.filter(Respondent.is_deleted == False, Visit.is_deleted == False)
+        results = query.all()
+
+        output = io.StringIO()
+        writer = csv.writer(output)
+
+        header = [
+            "respondent_code",
+            "visit_id",
+            "visit_date",
+            "sat_q1_clarity",
+            "sat_q2_ease_of_use",
+            "sat_q3_confidence",
+            "sat_q4_presentation",
+            "sat_q5_results_display",
+            "sat_q6_usefulness",
+            "sat_q7_overall_satisfaction",
+            "sat_comments",
+            "completed_at",
+        ]
+        writer.writerow(header)
+
+        for respondent, visit, satisfaction in results:
+            row = [
+                respondent.respondent_code,
+                visit.id,
+                visit.visit_date.isoformat() if visit.visit_date else "",
+                satisfaction.q1_clarity or "",
+                satisfaction.q2_ease_of_use or "",
+                satisfaction.q3_confidence or "",
+                satisfaction.q4_presentation or "",
+                satisfaction.q5_results_display or "",
+                satisfaction.q6_usefulness or "",
+                satisfaction.q7_overall_satisfaction or "",
+                satisfaction.comments or "",
+                (
+                    satisfaction.completed_at.isoformat()
+                    if satisfaction.completed_at
+                    else ""
+                ),
             ]
             writer.writerow(row)
 
@@ -290,24 +514,38 @@ class ExportService:
 
         # Combined header
         header = [
+            # Respondent info
             "respondent_code",
+            "respondent_status",
+            "age",
+            "sex",
+            "education_level",
+            "marital_status",
+            "monthly_income",
+            "living_arrangement",
+            # Visit info
             "visit_id",
             "visit_number",
             "visit_date",
             "visit_type",
-            "age",
-            "sex",
-            "education_level",
+            # SANSA
             "has_sansa",
             "sansa_total",
             "sansa_level",
+            # MNA
             "has_mna",
             "mna_total",
             "mna_category",
+            # BIA
             "has_bia",
             "bia_bmi",
-            "bia_waist_cm",
+            "bia_bmi_category",
+            "bia_body_fat_pct",
+            "bia_muscle_mass_kg",
+            # Satisfaction
             "has_satisfaction",
+            "sat_avg_score",
+            "sat_overall",
         ]
         writer.writerow(header)
 
@@ -335,29 +573,61 @@ class ExportService:
                 .first()
             )
 
+            # Calculate satisfaction average
+            sat_avg = ""
+            sat_overall = ""
+            if satisfaction:
+                scores = [
+                    satisfaction.q1_clarity,
+                    satisfaction.q2_ease_of_use,
+                    satisfaction.q3_confidence,
+                    satisfaction.q4_presentation,
+                    satisfaction.q5_results_display,
+                    satisfaction.q6_usefulness,
+                    satisfaction.q7_overall_satisfaction,
+                ]
+                valid_scores = [s for s in scores if s is not None]
+                if valid_scores:
+                    sat_avg = round(sum(valid_scores) / len(valid_scores), 2)
+                    sat_overall = satisfaction.q7_overall_satisfaction or ""
+
             row = [
+                # Respondent info
                 respondent.respondent_code,
+                respondent.status or "",
+                respondent.age or "",
+                self._encode_sex(respondent.sex),
+                respondent.education_level or "",
+                respondent.marital_status or "",
+                respondent.monthly_income or "",
+                respondent.living_arrangement or "",
+                # Visit info
                 visit.id,
                 visit.visit_number,
                 visit.visit_date.isoformat() if visit.visit_date else "",
                 visit.visit_type or "",
-                respondent.age or "",
-                self._encode_sex(respondent.sex),
-                respondent.education_level or "",
+                # SANSA
                 1 if sansa else 0,
                 float(sansa.total_score) if sansa and sansa.total_score else "",
                 self._encode_sansa_level(sansa.result_level) if sansa else "",
+                # MNA
                 1 if mna else 0,
-                float(mna.total_score) if mna and mna.total_score else "",
+                float(mna.mna_total) if mna and mna.mna_total else "",
                 self._encode_mna_category(mna.result_category) if mna else "",
+                # BIA
                 1 if bia else 0,
                 float(bia.bmi) if bia and bia.bmi else "",
+                bia.bmi_category if bia else "",
                 (
-                    float(bia.waist_circumference_cm)
-                    if bia and bia.waist_circumference_cm
+                    float(bia.body_fat_percentage)
+                    if bia and bia.body_fat_percentage
                     else ""
                 ),
+                float(bia.muscle_mass_kg) if bia and bia.muscle_mass_kg else "",
+                # Satisfaction
                 1 if satisfaction else 0,
+                sat_avg,
+                sat_overall,
             ]
             writer.writerow(row)
 

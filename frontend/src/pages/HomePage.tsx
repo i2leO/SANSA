@@ -1,9 +1,6 @@
-import { useUIStore } from "@/stores/uiStore";
 import { Link } from "react-router-dom";
 
 export default function HomePage() {
-  const { largeTextMode, toggleLargeText } = useUIStore();
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-primary-50 to-white">
       <div className="container mx-auto px-4 py-8">
@@ -14,16 +11,6 @@ export default function HomePage() {
             Self-administered Nutrition Screening and Assessment Tool
           </p>
         </header>
-
-        {/* Accessibility Toggle */}
-        <div className="flex justify-end mb-6">
-          <button
-            onClick={toggleLargeText}
-            className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"
-          >
-            {largeTextMode ? "Normal Text" : "Large Text"}
-          </button>
-        </div>
 
         {/* Main Navigation Cards */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">

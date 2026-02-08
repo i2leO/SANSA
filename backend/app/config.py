@@ -4,7 +4,9 @@ from functools import lru_cache
 
 class Settings(BaseSettings):
     # Database
-    DATABASE_URL: str = "mysql+pymysql://root:password@localhost:3306/sansa_db"
+    DATABASE_URL: str = (
+        "mysql+pymysql://root:root@localhost/SANSA?unix_socket=/Applications/MAMP/tmp/mysql/mysql.sock"
+    )
 
     # JWT
     JWT_SECRET_KEY: str = "your-secret-key-change-in-production"
