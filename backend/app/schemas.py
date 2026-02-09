@@ -527,59 +527,6 @@ class MNAResponseFullV2(BaseModel):
         from_attributes = True
 
 
-# BIA Schemas
-class BIARecordCreate(BaseModel):
-    visit_id: int
-    weight_kg: Optional[Decimal] = Field(None, ge=0, le=500)
-    height_cm: Optional[Decimal] = Field(None, ge=0, le=300)
-    bmi: Optional[Decimal] = None
-    body_fat_percentage: Optional[Decimal] = Field(None, ge=0, le=100)
-    muscle_mass_kg: Optional[Decimal] = Field(None, ge=0)
-    bone_mass_kg: Optional[Decimal] = Field(None, ge=0)
-    water_percentage: Optional[Decimal] = Field(None, ge=0, le=100)
-    visceral_fat_level: Optional[int] = Field(None, ge=0)
-    waist_circumference_cm: Optional[Decimal] = Field(None, ge=0)
-    hip_circumference_cm: Optional[Decimal] = Field(None, ge=0)
-    waist_hip_ratio: Optional[Decimal] = None
-    notes: Optional[str] = None
-
-
-class BIARecordUpdate(BaseModel):
-    weight_kg: Optional[Decimal] = Field(None, ge=0, le=500)
-    height_cm: Optional[Decimal] = Field(None, ge=0, le=300)
-    bmi: Optional[Decimal] = None
-    body_fat_percentage: Optional[Decimal] = Field(None, ge=0, le=100)
-    muscle_mass_kg: Optional[Decimal] = Field(None, ge=0)
-    bone_mass_kg: Optional[Decimal] = Field(None, ge=0)
-    water_percentage: Optional[Decimal] = Field(None, ge=0, le=100)
-    visceral_fat_level: Optional[int] = Field(None, ge=0)
-    waist_circumference_cm: Optional[Decimal] = Field(None, ge=0)
-    hip_circumference_cm: Optional[Decimal] = Field(None, ge=0)
-    waist_hip_ratio: Optional[Decimal] = None
-    notes: Optional[str] = None
-
-
-class BIARecordResponse(BaseModel):
-    id: int
-    visit_id: int
-    weight_kg: Optional[Decimal]
-    height_cm: Optional[Decimal]
-    bmi: Optional[Decimal]
-    body_fat_percentage: Optional[Decimal]
-    muscle_mass_kg: Optional[Decimal]
-    bone_mass_kg: Optional[Decimal]
-    water_percentage: Optional[Decimal]
-    visceral_fat_level: Optional[int]
-    waist_circumference_cm: Optional[Decimal]
-    hip_circumference_cm: Optional[Decimal]
-    waist_hip_ratio: Optional[Decimal]
-    notes: Optional[str]
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
 # Food Diary Schemas
 class FoodDiaryEntryCreate(BaseModel):
     visit_id: int

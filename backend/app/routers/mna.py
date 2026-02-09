@@ -198,18 +198,18 @@ def update_mna_response(
 
     # Update scores (Q1-Q7 use mna_s1-mna_s7, Q8-Q18 use mna_a1-mna_a11)
     for q_num in range(1, 8):
-        score_field = f\"mna_s{q_num}\"
+        score_field = f"mna_s{q_num}"
         if score_field in scores:
             setattr(mna_response, score_field, scores[score_field])
 
     for q_num in range(8, 19):
-        score_field = f\"mna_a{q_num - 7}\"
+        score_field = f"mna_a{q_num - 7}"
         if score_field in scores:
             setattr(mna_response, score_field, scores[score_field])
 
-    mna_response.mna_screen_total = scores[\"mna_screen_total\"]
-    mna_response.mna_ass_total = scores.get(\"mna_ass_total\", 0)
-    mna_response.mna_total = scores[\"mna_total\"]
+    mna_response.mna_screen_total = scores["mna_screen_total"]
+    mna_response.mna_ass_total = scores.get("mna_ass_total", 0)
+    mna_response.mna_total = scores["mna_total"]
     mna_response.result_category = scores["result_category"]
 
     db.commit()
@@ -277,9 +277,7 @@ def get_mna_advice(mna_response_id: int, db: Session = Depends(get_db)):
             else None
         ),
         "assessment_total": (
-            float(mna_response.mna_ass_total)
-            if mna_response.mna_ass_total
-            else None
+            float(mna_response.mna_ass_total) if mna_response.mna_ass_total else None
         ),
         "advice_text_th": advice["th"],
         "advice_text_en": advice["en"],
