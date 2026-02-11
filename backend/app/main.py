@@ -13,6 +13,9 @@ from app.routers import (
     mna,
     exports,
     food_diary,
+    facilities,
+    knowledge,
+    scoring,
 )
 
 settings = get_settings()
@@ -30,6 +33,8 @@ app.add_middleware(
         settings.FRONTEND_URL,
         "http://localhost:5173",
         "http://localhost:5174",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -52,6 +57,9 @@ app.include_router(bia.router)
 app.include_router(mna.router)
 app.include_router(exports.router)
 app.include_router(food_diary.router)
+app.include_router(facilities.router)
+app.include_router(knowledge.router)
+app.include_router(scoring.router)
 
 
 @app.get("/")
