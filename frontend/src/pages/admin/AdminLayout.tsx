@@ -43,6 +43,15 @@ export default function AdminLayout({ children, title }: { children: ReactNode; 
                 {user?.role === "admin" ? "ผู้ดูแลระบบ" : "เจ้าหน้าที่"}
               </p>
             </div>
+
+            {!isDashboard && (
+              <button
+                onClick={() => navigate("/admin/dashboard")}
+                className="px-4 py-2 border-2 border-primary-600 text-primary-700 rounded-lg hover:bg-primary-50 transition-colors"
+              >
+                แดชบอร์ด
+              </button>
+            )}
             <button
               onClick={handleLogout}
               className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
@@ -53,20 +62,7 @@ export default function AdminLayout({ children, title }: { children: ReactNode; 
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-8">
-        {!isDashboard && (
-          <div className="mb-6">
-            <button
-              onClick={() => navigate("/admin/dashboard")}
-              className="text-primary-600 hover:text-primary-700 font-medium"
-            >
-              ← กลับหน้าแดชบอร์ด
-            </button>
-          </div>
-        )}
-
-        {children}
-      </div>
+      <div className="container mx-auto px-4 py-8">{children}</div>
     </div>
   );
 }

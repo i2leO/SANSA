@@ -1,9 +1,10 @@
 import apiClient from "@/lib/api";
 import { RespondentCreate } from "@/types";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState } from "react";
+import { BrowserQRCodeReader, IScannerControls } from "@zxing/browser";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { z } from "zod";
 
 const respondentSchema = z.object({
@@ -14,19 +15,54 @@ type RespondentForm = z.infer<typeof respondentSchema>;
 
 export default function RespondentStartPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [mode, setMode] = useState<"new" | "existing">("new");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [scanOpen, setScanOpen] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const scannerControlsRef = useRef<IScannerControls | null>(null);
+  const hasAutoHandledCodeRef = useRef(false);
+
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm<RespondentForm>({
     resolver: zodResolver(respondentSchema),
   });
 
-  const handleNewRespondent = async () => {
+  const stopScanner = useCallback(() => {
+    scannerControlsRef.current?.stop();
+    scannerControlsRef.current = null;
+  }, []);
+
+  const extractCodeFromQrText = useCallback((text: string): string | null => {
+    const trimmed = text.trim();
+    if (!trimmed) return null;
+
+    try {
+      const url = new URL(trimmed);
+      // Support QR that is a deep link (e.g. /sansa/<code> or /general-info/<code>)
+      if (url.origin === window.location.origin) {
+        const path = url.pathname.replace(/\/+$/, "");
+        const m = path.match(/^\/(sansa|general-info)\/([^/]+)$/);
+        if (m) return m[2];
+      }
+
+      const code = url.searchParams.get("code");
+      if (code && code.trim()) return code.trim();
+    } catch {
+      // Not a URL; treat as raw code
+    }
+
+    return trimmed;
+  }, []);
+
+  const handleNewRespondent = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -40,35 +76,117 @@ export default function RespondentStartPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [navigate]);
 
-  const handleExistingRespondent = async (data: RespondentForm) => {
-    if (!data.respondent_code) {
-      setError("กรุณาใส่รหัสผู้เข้าร่วม");
+  const handleExistingRespondent = useCallback(
+    async (data: RespondentForm) => {
+      if (!data.respondent_code) {
+        setError("กรุณาใส่รหัสผู้เข้าร่วม");
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        // Check if code exists
+        const response = await apiClient.post("/respondents/check-code", {
+          code: data.respondent_code,
+        });
+
+        if (response.data.exists) {
+          navigate(`/general-info/${data.respondent_code}`);
+        } else {
+          setError("ไม่พบรหัสผู้เข้าร่วม กรุณาตรวจสอบและลองอีกครั้ง");
+        }
+      } catch (err: unknown) {
+        const error = err as { response?: { data?: { detail?: string } } };
+        setError(error.response?.data?.detail || "ไม่สามารถตรวจสอบรหัสผู้เข้าร่วมได้");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [navigate],
+  );
+
+  const startScanner = useCallback(async () => {
+    setScanError(null);
+    setError(null);
+
+    if (!videoRef.current) {
+      setScanError("ไม่พบกล้อง (video element)");
       return;
     }
 
-    setLoading(true);
-    setError(null);
+    stopScanner();
 
     try {
-      // Check if code exists
-      const response = await apiClient.post("/respondents/check-code", {
-        code: data.respondent_code,
+      const reader = new BrowserQRCodeReader();
+      const controls = await reader.decodeFromVideoDevice(undefined, videoRef.current, (result) => {
+        if (!result) return;
+        const raw = result.getText();
+
+        // If QR contains an in-app URL (same origin), navigate directly.
+        try {
+          const url = new URL(raw.trim());
+          if (url.origin === window.location.origin) {
+            const route = `${url.pathname}${url.search}${url.hash}`;
+            stopScanner();
+            setScanOpen(false);
+            navigate(route);
+            return;
+          }
+        } catch {
+          // ignore
+        }
+
+        const code = extractCodeFromQrText(raw);
+        if (!code) {
+          setScanError("อ่าน QR ได้แต่ไม่พบ code");
+          return;
+        }
+
+        stopScanner();
+        setScanOpen(false);
+        setMode("existing");
+        setValue("respondent_code", code, { shouldDirty: true, shouldTouch: true });
+        void handleExistingRespondent({ respondent_code: code });
       });
 
-      if (response.data.exists) {
-        navigate(`/general-info/${data.respondent_code}`);
-      } else {
-        setError("ไม่พบรหัสผู้เข้าร่วม กรุณาตรวจสอบและลองอีกครั้ง");
-      }
-    } catch (err: unknown) {
-      const error = err as { response?: { data?: { detail?: string } } };
-      setError(error.response?.data?.detail || "ไม่สามารถตรวจสอบรหัสผู้เข้าร่วมได้");
-    } finally {
-      setLoading(false);
+      scannerControlsRef.current = controls;
+    } catch (e: unknown) {
+      const message =
+        typeof e === "object" &&
+        e !== null &&
+        "message" in e &&
+        typeof (e as { message: unknown }).message === "string"
+          ? (e as { message: string }).message
+          : "ไม่สามารถเปิดกล้องเพื่อสแกน QR ได้";
+      setScanError(message);
+      stopScanner();
     }
-  };
+  }, [extractCodeFromQrText, handleExistingRespondent, setValue, stopScanner]);
+
+  useEffect(() => {
+    // Stop camera when leaving page or closing scanner
+    return () => {
+      stopScanner();
+    };
+  }, [stopScanner]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const code = params.get("code")?.trim();
+    if (!code) return;
+
+    // Handle only once per mount to avoid loops
+    if (hasAutoHandledCodeRef.current) return;
+    hasAutoHandledCodeRef.current = true;
+
+    setMode("existing");
+    setValue("respondent_code", code, { shouldDirty: true });
+    void handleExistingRespondent({ respondent_code: code });
+  }, [handleExistingRespondent, location.search, setValue]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-primary-50 to-white">
@@ -138,6 +256,55 @@ export default function RespondentStartPage() {
           {mode === "existing" && (
             <div className="bg-white rounded-xl shadow-lg p-8 border-2 border-primary-200">
               <h2 className="text-2xl font-semibold mb-4 text-primary-800">ใส่รหัสของคุณ</h2>
+
+              <div className="mb-4 flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = !scanOpen;
+                    setScanOpen(next);
+                    setScanError(null);
+                    if (!next) {
+                      stopScanner();
+                    }
+                  }}
+                  className="px-4 py-2 rounded-lg border-2 border-primary-200 text-primary-700 hover:bg-primary-50 font-medium"
+                >
+                  {scanOpen ? "ปิดสแกน QR" : "สแกน QR"}
+                </button>
+                <div className="text-sm text-gray-600">สแกน QR เพื่อกรอกรหัสอัตโนมัติ</div>
+              </div>
+
+              {scanOpen && (
+                <div className="mb-6 p-4 border-2 border-gray-200 rounded-xl bg-gray-50">
+                  <div className="flex items-center justify-between gap-3 mb-3">
+                    <div className="font-medium text-gray-800">กล้องสแกน QR</div>
+                    <button
+                      type="button"
+                      onClick={() => void startScanner()}
+                      className="px-3 py-1.5 rounded-lg bg-primary-600 text-white hover:bg-primary-700 text-sm font-medium"
+                    >
+                      เริ่มสแกน
+                    </button>
+                  </div>
+                  <video
+                    ref={videoRef}
+                    className="w-full rounded-lg bg-black aspect-video"
+                    muted
+                    playsInline
+                  />
+                  {scanError && (
+                    <div className="mt-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
+                      {scanError}
+                      <div className="mt-1 text-xs text-red-700">
+                        หมายเหตุ: การใช้กล้องต้องเป็น secure context (เช่น https หรือ
+                        http://localhost)
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <form onSubmit={handleSubmit(handleExistingRespondent)} className="space-y-6">
                 <div>
                   <label className="block text-gray-700 font-medium mb-2">รหัสผู้เข้าร่วม</label>

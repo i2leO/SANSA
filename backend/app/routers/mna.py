@@ -57,36 +57,36 @@ def create_mna_response(mna_create: MNAResponseCreate, db: Session = Depends(get
         mna_s2=scores.get("mna_s2"),
         q3_mobility=mna_create.q3_mobility,
         mna_s3=scores.get("mna_s3"),
-        q4_psychological_stress=mna_create.q4_psychological_stress,
+        q4_stress_illness=mna_create.q4_stress_illness,
         mna_s4=scores.get("mna_s4"),
-        q5_neuropsychological_problems=mna_create.q5_neuropsychological_problems,
+        q5_neuropsychological=mna_create.q5_neuropsychological,
         mna_s5=scores.get("mna_s5"),
-        q6_bmi_or_calf=mna_create.q6_bmi_or_calf,
+        q6_bmi=mna_create.q6_bmi,
         mna_s6=scores.get("mna_s6"),
-        q7_independent_living=mna_create.q7_independent_living,
+        q7_calf_circumference=mna_create.q7_calf_circumference,
         mna_s7=scores.get("mna_s7"),
         # Assessment questions (Q8-Q18) - only if screening ≤11
-        q8_medications=mna_create.q8_medications,
+        q8_independent_living=mna_create.q8_independent_living,
         mna_a1=scores.get("mna_a1"),
-        q9_pressure_ulcers=mna_create.q9_pressure_ulcers,
+        q9_medications=mna_create.q9_medications,
         mna_a2=scores.get("mna_a2"),
-        q10_meals_per_day=mna_create.q10_meals_per_day,
+        q10_pressure_sores=mna_create.q10_pressure_sores,
         mna_a3=scores.get("mna_a3"),
-        q11_protein_markers=mna_create.q11_protein_markers,
+        q11_full_meals=mna_create.q11_full_meals,
         mna_a4=scores.get("mna_a4"),
-        q12_fruits_vegetables=mna_create.q12_fruits_vegetables,
+        q12_protein_consumption=mna_create.q12_protein_consumption,
         mna_a5=scores.get("mna_a5"),
-        q13_fluid_intake=mna_create.q13_fluid_intake,
+        q13_fruits_vegetables=mna_create.q13_fruits_vegetables,
         mna_a6=scores.get("mna_a6"),
-        q14_feeding_ability=mna_create.q14_feeding_ability,
+        q14_fluid_intake=mna_create.q14_fluid_intake,
         mna_a7=scores.get("mna_a7"),
-        q15_self_nutrition_view=mna_create.q15_self_nutrition_view,
+        q15_eating_independence=mna_create.q15_eating_independence,
         mna_a8=scores.get("mna_a8"),
-        q16_health_comparison=mna_create.q16_health_comparison,
+        q16_self_nutrition=mna_create.q16_self_nutrition,
         mna_a9=scores.get("mna_a9"),
-        q17_mid_arm_circumference=mna_create.q17_mid_arm_circumference,
+        q17_health_comparison=mna_create.q17_health_comparison,
         mna_a10=scores.get("mna_a10"),
-        q18_calf_circumference=mna_create.q18_calf_circumference,
+        q18_mid_arm_circumference=mna_create.q18_mid_arm_circumference,
         mna_a11=scores.get("mna_a11"),
         # Totals
         mna_screen_total=scores["mna_screen_total"],
@@ -156,33 +156,32 @@ def update_mna_response(
         or mna_response.q1_food_intake_decline,
         q2_weight_loss=mna_update.q2_weight_loss or mna_response.q2_weight_loss,
         q3_mobility=mna_update.q3_mobility or mna_response.q3_mobility,
-        q4_psychological_stress=mna_update.q4_psychological_stress
-        or mna_response.q4_psychological_stress,
-        q5_neuropsychological_problems=mna_update.q5_neuropsychological_problems
-        or mna_response.q5_neuropsychological_problems,
-        q6_bmi_or_calf=mna_update.q6_bmi_or_calf or mna_response.q6_bmi_or_calf,
-        q7_independent_living=mna_update.q7_independent_living
-        or mna_response.q7_independent_living,
-        q8_medications=mna_update.q8_medications or mna_response.q8_medications,
-        q9_pressure_ulcers=mna_update.q9_pressure_ulcers
-        or mna_response.q9_pressure_ulcers,
-        q10_meals_per_day=mna_update.q10_meals_per_day
-        or mna_response.q10_meals_per_day,
-        q11_protein_markers=mna_update.q11_protein_markers
-        or mna_response.q11_protein_markers,
-        q12_fruits_vegetables=mna_update.q12_fruits_vegetables
-        or mna_response.q12_fruits_vegetables,
-        q13_fluid_intake=mna_update.q13_fluid_intake or mna_response.q13_fluid_intake,
-        q14_feeding_ability=mna_update.q14_feeding_ability
-        or mna_response.q14_feeding_ability,
-        q15_self_nutrition_view=mna_update.q15_self_nutrition_view
-        or mna_response.q15_self_nutrition_view,
-        q16_health_comparison=mna_update.q16_health_comparison
-        or mna_response.q16_health_comparison,
-        q17_mid_arm_circumference=mna_update.q17_mid_arm_circumference
-        or mna_response.q17_mid_arm_circumference,
-        q18_calf_circumference=mna_update.q18_calf_circumference
-        or mna_response.q18_calf_circumference,
+        q4_stress_illness=mna_update.q4_stress_illness
+        or mna_response.q4_stress_illness,
+        q5_neuropsychological=mna_update.q5_neuropsychological
+        or mna_response.q5_neuropsychological,
+        q6_bmi=mna_update.q6_bmi or mna_response.q6_bmi,
+        q7_calf_circumference=mna_update.q7_calf_circumference
+        or mna_response.q7_calf_circumference,
+        q8_independent_living=mna_update.q8_independent_living
+        or mna_response.q8_independent_living,
+        q9_medications=mna_update.q9_medications or mna_response.q9_medications,
+        q10_pressure_sores=mna_update.q10_pressure_sores
+        or mna_response.q10_pressure_sores,
+        q11_full_meals=mna_update.q11_full_meals or mna_response.q11_full_meals,
+        q12_protein_consumption=mna_update.q12_protein_consumption
+        or mna_response.q12_protein_consumption,
+        q13_fruits_vegetables=mna_update.q13_fruits_vegetables
+        or mna_response.q13_fruits_vegetables,
+        q14_fluid_intake=mna_update.q14_fluid_intake or mna_response.q14_fluid_intake,
+        q15_eating_independence=mna_update.q15_eating_independence
+        or mna_response.q15_eating_independence,
+        q16_self_nutrition=mna_update.q16_self_nutrition
+        or mna_response.q16_self_nutrition,
+        q17_health_comparison=mna_update.q17_health_comparison
+        or mna_response.q17_health_comparison,
+        q18_mid_arm_circumference=mna_update.q18_mid_arm_circumference
+        or mna_response.q18_mid_arm_circumference,
     )
 
     try:

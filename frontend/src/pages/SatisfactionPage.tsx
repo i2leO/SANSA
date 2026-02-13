@@ -37,11 +37,11 @@ export default function SatisfactionPage() {
       });
 
       // Navigate to results page
-      navigate(`/visit/${visitId}/result`);
+      navigate(`/result/${visitId}`);
     } catch (err: any) {
       console.error("Error submitting satisfaction survey:", err);
       setError(
-        err.response?.data?.detail || "เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาลองใหม่อีกครั้ง"
+        err.response?.data?.detail || "เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาลองใหม่อีกครั้ง",
       );
     } finally {
       setIsSubmitting(false);
@@ -50,7 +50,7 @@ export default function SatisfactionPage() {
 
   const handleSkip = () => {
     // Skip satisfaction survey and go directly to results
-    navigate(`/visit/${visitId}/result`);
+    navigate(`/result/${visitId}`);
   };
 
   const likertOptions = [
@@ -165,7 +165,7 @@ export default function SatisfactionPage() {
 
           <form onSubmit={handleSubmit} className="space-y-8">
             {/* Questions */}
-            {questions.map((question, index) => (
+            {questions.map((question) => (
               <div
                 key={question.id}
                 className="p-6 bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl border-2 border-purple-100 hover:border-purple-300 transition-colors"

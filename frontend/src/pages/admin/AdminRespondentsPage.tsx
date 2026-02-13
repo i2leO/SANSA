@@ -49,12 +49,6 @@ export default function AdminRespondentsPage() {
           <h1 className="text-2xl font-bold text-gray-800">ผู้เข้าร่วมการประเมิน</h1>
           <p className="text-gray-600">คลิกเพื่อดูรายละเอียดผู้เข้าร่วมและการประเมิน</p>
         </div>
-        <button
-          onClick={() => navigate("/admin/dashboard")}
-          className="text-primary-600 hover:text-primary-700 font-medium"
-        >
-          ← กลับหน้าแดชบอร์ด
-        </button>
       </div>
 
       <div className="bg-white rounded-xl shadow p-4 mb-4 border border-gray-200">

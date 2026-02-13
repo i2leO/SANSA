@@ -1,6 +1,7 @@
 import apiClient from "@/lib/api";
 import AdminLayout from "@/pages/admin/AdminLayout";
 import { Respondent, Visit } from "@/types";
+import * as QRCode from "qrcode";
 import { Dispatch, SetStateAction, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -41,6 +42,51 @@ export default function AdminRespondentDetailPage() {
   const [sansaByVisitId, setSansaByVisitId] = useState<FetchMap>({});
   const [mnaByVisitId, setMnaByVisitId] = useState<FetchMap>({});
   const [biaByVisitId, setBiaByVisitId] = useState<FetchMap>({});
+
+  const [qrUrl, setQrUrl] = useState<string | null>(null);
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const [qrError, setQrError] = useState<string | null>(null);
+  const [copyStatus, setCopyStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!respondentCode) return;
+
+    const url = `${window.location.origin}/sansa/${encodeURIComponent(respondentCode)}`;
+    setQrUrl(url);
+    setQrDataUrl(null);
+    setQrError(null);
+    setCopyStatus(null);
+
+    let cancelled = false;
+    const toDataURLFn: ((text: string, opts?: unknown) => Promise<string>) | undefined = (
+      QRCode as unknown as { toDataURL?: (text: string, opts?: unknown) => Promise<string> }
+    ).toDataURL;
+
+    if (!toDataURLFn) {
+      setQrError("ไม่สามารถสร้าง QR ได้ (ไม่พบฟังก์ชัน toDataURL)");
+      return;
+    }
+
+    toDataURLFn(url, { margin: 1, width: 220 })
+      .then((data) => {
+        if (!cancelled) setQrDataUrl(data);
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return;
+        const message =
+          typeof e === "object" &&
+          e !== null &&
+          "message" in e &&
+          typeof (e as { message: unknown }).message === "string"
+            ? (e as { message: string }).message
+            : "สร้าง QR ไม่สำเร็จ";
+        setQrError(message);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [respondentCode]);
 
   useEffect(() => {
     const load = async () => {
@@ -138,6 +184,78 @@ export default function AdminRespondentDetailPage() {
               <div>
                 <div className="text-sm text-gray-500">ติดต่อ</div>
                 <div className="font-semibold">{respondent.email || respondent.phone || "-"}</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow p-6 border border-gray-200 mb-6">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-800">QR สำหรับผู้เข้าร่วมเดิม</h2>
+                <p className="text-sm text-gray-600">
+                  สแกนเพื่อเข้าแบบประเมินได้ทันที (ใช้ได้หลังมี visit ครั้งแรกแล้ว)
+                </p>
+
+                {visits.length === 0 && (
+                  <div className="mt-3 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg p-3">
+                    ยังไม่มี visit แต่สามารถดาวน์โหลด QR ได้เลย
+                    (ผู้ใช้สแกนแล้วจะเริ่มทำครั้งแรกได้ทันที)
+                  </div>
+                )}
+
+                {qrUrl && (
+                  <div className="mt-3">
+                    <div className="text-xs text-gray-500 mb-1">ลิงก์</div>
+                    <div className="font-mono text-xs break-all text-gray-800">{qrUrl}</div>
+                    <div className="mt-2 flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!qrUrl) return;
+                          try {
+                            await navigator.clipboard.writeText(qrUrl);
+                            setCopyStatus("คัดลอกลิงก์แล้ว");
+                          } catch {
+                            setCopyStatus("คัดลอกไม่สำเร็จ (อาจไม่อนุญาต clipboard)");
+                          }
+                        }}
+                        className="px-3 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm font-medium"
+                      >
+                        คัดลอกลิงก์
+                      </button>
+
+                      {qrDataUrl && (
+                        <a
+                          href={qrDataUrl}
+                          download={`respondent_${respondentCode}_qr.png`}
+                          className="px-3 py-2 rounded-lg bg-primary-600 text-white hover:bg-primary-700 text-sm font-medium"
+                        >
+                          ดาวน์โหลด QR
+                        </a>
+                      )}
+
+                      {copyStatus && <div className="text-sm text-gray-600">{copyStatus}</div>}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="shrink-0">
+                {qrDataUrl ? (
+                  <img
+                    src={qrDataUrl}
+                    alt="QR code"
+                    className="w-[220px] h-[220px] rounded-lg border border-gray-200 bg-white"
+                  />
+                ) : qrError ? (
+                  <div className="w-[220px] rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                    {qrError}
+                  </div>
+                ) : (
+                  <div className="w-[220px] h-[220px] rounded-lg border border-gray-200 bg-gray-50 flex items-center justify-center text-sm text-gray-600">
+                    กำลังสร้าง QR...
+                  </div>
+                )}
               </div>
             </div>
           </div>

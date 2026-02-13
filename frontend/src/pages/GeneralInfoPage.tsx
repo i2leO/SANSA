@@ -65,9 +65,16 @@ export default function GeneralInfoPage() {
           setIncomeSourcesChecked(response.data.income_sources);
         }
         if (response.data.chronic_diseases) {
-          setValue("chronic_diseases", response.data.chronic_diseases);
-          setChronicDiseasesChecked(response.data.chronic_diseases.diseases || []);
-          setChronicDiseasesOther(response.data.chronic_diseases.other || "");
+          const diseases = Array.isArray(response.data.chronic_diseases.diseases)
+            ? response.data.chronic_diseases.diseases
+            : [];
+          const other =
+            typeof response.data.chronic_diseases.other === "string"
+              ? response.data.chronic_diseases.other
+              : "";
+          setValue("chronic_diseases", { diseases, other });
+          setChronicDiseasesChecked(diseases);
+          setChronicDiseasesOther(other);
         }
         if (response.data.living_arrangement)
           setValue("living_arrangement", response.data.living_arrangement);
@@ -309,7 +316,7 @@ export default function GeneralInfoPage() {
                       />
                       <span className="ml-3 text-gray-700 font-medium">{source}</span>
                     </label>
-                  )
+                  ),
                 )}
               </div>
             </div>
@@ -334,7 +341,7 @@ export default function GeneralInfoPage() {
                       />
                       <span className="ml-3 text-gray-700 font-medium">{disease}</span>
                     </label>
-                  )
+                  ),
                 )}
                 <div className="mt-3">
                   <label className="block text-gray-700 mb-2">อื่นๆ (ระบุ)</label>

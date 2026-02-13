@@ -96,13 +96,18 @@ export default function BIAMeasurementPage() {
         staff_signature: formData.staff_signature || null,
       });
 
-      // Navigate back or to results
-      navigate(`/visit/${visitId}/result`);
+      // Continue to satisfaction survey
+      navigate(`/satisfaction/${visitId}`);
     } catch (err: any) {
       console.error("Error submitting BIA record:", err);
-      setError(
-        err.response?.data?.detail || "เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาลองใหม่อีกครั้ง"
-      );
+      const detail = err?.response?.data?.detail;
+      const isDuplicate =
+        typeof detail === "string" && detail.toLowerCase().includes("already exists");
+      if (isDuplicate) {
+        navigate(`/satisfaction/${visitId}`);
+        return;
+      }
+      setError(detail || "เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาลองใหม่อีกครั้ง");
     } finally {
       setIsSubmitting(false);
     }
@@ -130,7 +135,6 @@ export default function BIAMeasurementPage() {
           </div>
           <h1 className="text-3xl font-bold text-gray-800 mb-2">การวัดองค์ประกอบร่างกาย (BIA)</h1>
           <p className="text-gray-600">Body Impedance Analysis Measurement</p>
-          <p className="text-sm text-orange-600 mt-2">⚠️ เฉพาะเจ้าหน้าที่เท่านั้น (Staff Only)</p>
         </div>
 
         {/* Main Card */}
@@ -397,14 +401,14 @@ export default function BIAMeasurementPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    ลายเซ็นเจ้าหน้าที่
+                    ผู้บันทึกข้อมูล
                   </label>
                   <input
                     type="text"
                     value={formData.staff_signature}
                     onChange={(e) => handleChange("staff_signature", e.target.value)}
                     className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:ring-2 focus:ring-teal-200"
-                    placeholder="ชื่อเจ้าหน้าที่ผู้บันทึกข้อมูล"
+                    placeholder="ชื่อผู้บันทึกข้อมูล (ถ้ามี)"
                   />
                 </div>
               </div>

@@ -36,12 +36,32 @@ export default function ResultPage() {
     }
   }, [visitId]);
 
-  const getResultColor = (level: string) => {
-    switch (level?.toLowerCase()) {
+  const normalizeLevel = (level: string | null | undefined) =>
+    (level || "").toString().trim().toLowerCase().replace(/_/g, "-");
+
+  const getResultLabel = (level: string | null | undefined) => {
+    switch (normalizeLevel(level)) {
+      case "normal":
+      case "ปกติ":
+        return "ปกติ";
+      case "at-risk":
+      case "เสี่ยง":
+        return "เสี่ยง";
+      case "malnourished":
+      case "ขาดสารอาหาร":
+        return "ขาดสารอาหาร";
+      default:
+        return level?.toString().trim() || "-";
+    }
+  };
+
+  const getResultColor = (level: string | null | undefined) => {
+    switch (normalizeLevel(level)) {
       case "normal":
       case "ปกติ":
         return "from-green-500 to-teal-600";
       case "at-risk":
+      case "at_risk":
       case "เสี่ยง":
         return "from-yellow-500 to-orange-600";
       case "malnourished":
@@ -52,12 +72,13 @@ export default function ResultPage() {
     }
   };
 
-  const getResultEmoji = (level: string) => {
-    switch (level?.toLowerCase()) {
+  const getResultEmoji = (level: string | null | undefined) => {
+    switch (normalizeLevel(level)) {
       case "normal":
       case "ปกติ":
         return "✅";
       case "at-risk":
+      case "at_risk":
       case "เสี่ยง":
         return "⚠️";
       case "malnourished":
@@ -68,12 +89,13 @@ export default function ResultPage() {
     }
   };
 
-  const getRecommendation = (level: string) => {
-    switch (level?.toLowerCase()) {
+  const getRecommendation = (level: string | null | undefined) => {
+    switch (normalizeLevel(level)) {
       case "normal":
       case "ปกติ":
         return "สถานะโภชนาการของคุณอยู่ในเกณฑ์ดี ควรรักษาพฤติกรรมการกินอาหารและการใช้ชีวิตที่ดีต่อไป";
       case "at-risk":
+      case "at_risk":
       case "เสี่ยง":
         return "คุณมีความเสี่ยงต่อภาวะทุพโภชนาการ แนะนำให้ปรับปรุงพฤติกรรมการกินอาหาร และปรึกษานักโภชนาการหรือแพทย์";
       case "malnourished":
@@ -128,7 +150,7 @@ export default function ResultPage() {
         {/* Score Card */}
         <div
           className={`bg-gradient-to-br ${getResultColor(
-            result.result_level
+            result.result_level,
           )} rounded-2xl shadow-xl p-8 mb-6 text-white`}
         >
           <h2 className="text-3xl font-bold mb-6 text-center">คะแนนของคุณ</h2>
@@ -154,9 +176,11 @@ export default function ResultPage() {
             <div className="text-2xl font-bold text-gray-800 mb-2">
               สถานะโภชนาการ:{" "}
               <span
-                className={`${getResultColor(result.result_level)} bg-clip-text text-transparent`}
+                className={`bg-gradient-to-r ${getResultColor(
+                  result.result_level,
+                )} bg-clip-text text-transparent`}
               >
-                {result.result_level}
+                {getResultLabel(result.result_level)}
               </span>
             </div>
           </div>
@@ -179,27 +203,27 @@ export default function ResultPage() {
         <div className="bg-white rounded-2xl shadow-xl p-6">
           <div className="flex flex-col md:flex-row gap-4">
             <button
-              onClick={() => navigate(`/satisfaction/${visitId}`)}
+              onClick={() => navigate("/")}
               className="flex-1 py-4 bg-gradient-to-r from-primary-600 to-teal-600 text-white rounded-xl hover:from-primary-700 hover:to-teal-700 font-bold text-lg shadow-lg"
             >
-              ดำเนินการต่อ: แบบสอบถามความพึงพอใจ →
+              เสร็จสิ้น → กลับหน้าหลัก
             </button>
             <button
-              onClick={() => navigate("/")}
+              onClick={() => navigate(-1)}
               className="flex-1 py-4 border-2 border-primary-600 text-primary-700 rounded-xl hover:bg-primary-50 font-bold text-lg"
             >
-              กลับหน้าหลัก
+              ย้อนกลับ
             </button>
           </div>
         </div>
 
         {/* Progress Bar */}
         <div className="mt-8 text-center text-gray-600">
-          <p className="text-sm mb-2">ขั้นตอนที่ 3 จาก 4 | ผลการประเมิน</p>
+          <p className="text-sm mb-2">ขั้นตอนที่ 5 จาก 5 | ผลการประเมิน</p>
           <div className="w-full bg-gray-200 rounded-full h-2">
             <div
               className="bg-gradient-to-r from-primary-600 to-teal-600 h-2 rounded-full transition-all"
-              style={{ width: "75%" }}
+              style={{ width: "100%" }}
             ></div>
           </div>
         </div>

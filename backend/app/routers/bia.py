@@ -4,7 +4,12 @@ from datetime import datetime
 from typing import Optional
 from app.database import get_db
 from app.models import BIARecord, Visit, User
-from app.schemas import BIARecordCreate, BIARecordUpdate, BIARecordResponse, MessageResponse
+from app.schemas import (
+    BIARecordCreate,
+    BIARecordUpdate,
+    BIARecordResponse,
+    MessageResponse,
+)
 from app.services.scoring_service import ScoringService
 from app.auth import get_current_staff_or_admin
 
@@ -12,14 +17,10 @@ router = APIRouter(prefix="/bia", tags=["bia"])
 
 
 @router.post("", response_model=BIARecordResponse)
-def create_bia_record(
-    bia_create: BIARecordCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_staff_or_admin)
-):
+def create_bia_record(bia_create: BIARecordCreate, db: Session = Depends(get_db)):
     """
     Create BIA (Body Impedance Analysis) record
-    Staff/admin only - this is a clinical measurement tool
+    Can be submitted by respondent (no auth) or staff (with auth)
     """
     # Verify visit exists
     visit = db.query(Visit).filter(Visit.id == bia_create.visit_id).first()
@@ -27,13 +28,12 @@ def create_bia_record(
         raise HTTPException(status_code=404, detail="Visit not found")
 
     # Check if BIA already exists for this visit
-    existing = db.query(BIARecord).filter(
-        BIARecord.visit_id == bia_create.visit_id
-    ).first()
+    existing = (
+        db.query(BIARecord).filter(BIARecord.visit_id == bia_create.visit_id).first()
+    )
     if existing:
         raise HTTPException(
-            status_code=400,
-            detail="BIA record already exists for this visit"
+            status_code=400, detail="BIA record already exists for this visit"
         )
 
     # Calculate BMI and category if weight and height provided
@@ -66,9 +66,9 @@ def create_bia_record(
         bmi_category=bmi_category,
         weight_management=bia_create.weight_management,
         food_recommendation=bia_create.food_recommendation,
-        staff_signature=bia_create.staff_signature or current_user.username,
+        staff_signature=bia_create.staff_signature,
         measurement_date=bia_create.measurement_date or datetime.utcnow().date(),
-        created_at=datetime.utcnow()
+        created_at=datetime.utcnow(),
     )
 
     db.add(bia_record)
@@ -79,14 +79,9 @@ def create_bia_record(
 
 
 @router.get("/{bia_record_id}", response_model=BIARecordResponse)
-def get_bia_record(
-    bia_record_id: int,
-    db: Session = Depends(get_db)
-):
+def get_bia_record(bia_record_id: int, db: Session = Depends(get_db)):
     """Get BIA record by ID"""
-    bia_record = db.query(BIARecord).filter(
-        BIARecord.id == bia_record_id
-    ).first()
+    bia_record = db.query(BIARecord).filter(BIARecord.id == bia_record_id).first()
 
     if not bia_record:
         raise HTTPException(status_code=404, detail="BIA record not found")
@@ -95,19 +90,13 @@ def get_bia_record(
 
 
 @router.get("/visit/{visit_id}", response_model=BIARecordResponse)
-def get_bia_by_visit(
-    visit_id: int,
-    db: Session = Depends(get_db)
-):
+def get_bia_by_visit(visit_id: int, db: Session = Depends(get_db)):
     """Get BIA record by visit ID"""
-    bia_record = db.query(BIARecord).filter(
-        BIARecord.visit_id == visit_id
-    ).first()
+    bia_record = db.query(BIARecord).filter(BIARecord.visit_id == visit_id).first()
 
     if not bia_record:
         raise HTTPException(
-            status_code=404,
-            detail="BIA record not found for this visit"
+            status_code=404, detail="BIA record not found for this visit"
         )
 
     return bia_record
@@ -118,12 +107,10 @@ def update_bia_record(
     bia_record_id: int,
     bia_update: BIARecordUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_staff_or_admin)
+    current_user: User = Depends(get_current_staff_or_admin),
 ):
     """Update existing BIA record (staff/admin only)"""
-    bia_record = db.query(BIARecord).filter(
-        BIARecord.id == bia_record_id
-    ).first()
+    bia_record = db.query(BIARecord).filter(BIARecord.id == bia_record_id).first()
 
     if not bia_record:
         raise HTTPException(status_code=404, detail="BIA record not found")
@@ -132,18 +119,18 @@ def update_bia_record(
     update_data = bia_update.dict(exclude_unset=True)
 
     # Recalculate BMI if weight or height changed
-    if 'weight_kg' in update_data or 'height_cm' in update_data:
-        weight = update_data.get('weight_kg', bia_record.weight_kg)
-        height = update_data.get('height_cm', bia_record.height_cm)
+    if "weight_kg" in update_data or "height_cm" in update_data:
+        weight = update_data.get("weight_kg", bia_record.weight_kg)
+        height = update_data.get("height_cm", bia_record.height_cm)
 
         if weight and height:
             height_m = height / 100
             bmi = weight / (height_m * height_m)
-            update_data['bmi'] = bmi
+            update_data["bmi"] = bmi
 
             # Update BMI category
             scoring_service = ScoringService(db)
-            update_data['bmi_category'] = scoring_service.get_bmi_category(bmi)
+            update_data["bmi_category"] = scoring_service.get_bmi_category(bmi)
 
     for field, value in update_data.items():
         setattr(bia_record, field, value)
@@ -158,12 +145,10 @@ def update_bia_record(
 def delete_bia_record(
     bia_record_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_staff_or_admin)
+    current_user: User = Depends(get_current_staff_or_admin),
 ):
     """Delete BIA record (staff/admin only)"""
-    bia_record = db.query(BIARecord).filter(
-        BIARecord.id == bia_record_id
-    ).first()
+    bia_record = db.query(BIARecord).filter(BIARecord.id == bia_record_id).first()
 
     if not bia_record:
         raise HTTPException(status_code=404, detail="BIA record not found")
@@ -175,19 +160,13 @@ def delete_bia_record(
 
 
 @router.get("/visit/{visit_id}/interpretation")
-def get_bia_interpretation(
-    visit_id: int,
-    db: Session = Depends(get_db)
-):
+def get_bia_interpretation(visit_id: int, db: Session = Depends(get_db)):
     """Get BIA interpretation and recommendations"""
-    bia_record = db.query(BIARecord).filter(
-        BIARecord.visit_id == visit_id
-    ).first()
+    bia_record = db.query(BIARecord).filter(BIARecord.visit_id == visit_id).first()
 
     if not bia_record:
         raise HTTPException(
-            status_code=404,
-            detail="BIA record not found for this visit"
+            status_code=404, detail="BIA record not found for this visit"
         )
 
     # Interpret body fat percentage based on age and sex
@@ -227,13 +206,21 @@ def get_bia_interpretation(
     return {
         "bmi": float(bia_record.bmi) if bia_record.bmi else None,
         "bmi_category": bia_record.bmi_category,
-        "body_fat_percentage": float(bia_record.body_fat_percentage) if bia_record.body_fat_percentage else None,
+        "body_fat_percentage": (
+            float(bia_record.body_fat_percentage)
+            if bia_record.body_fat_percentage
+            else None
+        ),
         "body_fat_interpretation": body_fat_interpretation,
-        "visceral_fat_kg": float(bia_record.visceral_fat_kg) if bia_record.visceral_fat_kg else None,
+        "visceral_fat_kg": (
+            float(bia_record.visceral_fat_kg) if bia_record.visceral_fat_kg else None
+        ),
         "visceral_fat_interpretation": visceral_fat_interpretation,
-        "muscle_mass_kg": float(bia_record.muscle_mass_kg) if bia_record.muscle_mass_kg else None,
+        "muscle_mass_kg": (
+            float(bia_record.muscle_mass_kg) if bia_record.muscle_mass_kg else None
+        ),
         "weight_management": bia_record.weight_management,
         "food_recommendation": bia_record.food_recommendation,
         "staff_signature": bia_record.staff_signature,
-        "measurement_date": bia_record.measurement_date
+        "measurement_date": bia_record.measurement_date,
     }

@@ -98,13 +98,18 @@ export default function MNAAssessmentPage() {
         ...formData,
       });
 
-      // Navigate to results page
-      navigate(`/visit/${visitId}/result`);
+      // Continue to BIA measurement
+      navigate(`/bia/${visitId}`);
     } catch (err: any) {
       console.error("Error submitting MNA assessment:", err);
-      setError(
-        err.response?.data?.detail || "เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาลองใหม่อีกครั้ง"
-      );
+      const detail = err?.response?.data?.detail;
+      const isDuplicate =
+        typeof detail === "string" && detail.toLowerCase().includes("already exists");
+      if (isDuplicate) {
+        navigate(`/bia/${visitId}`);
+        return;
+      }
+      setError(detail || "เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาลองใหม่อีกครั้ง");
     } finally {
       setIsSubmitting(false);
     }

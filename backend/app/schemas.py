@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field, validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, EmailStr, Field, validator
 from typing import Optional, List
 from datetime import datetime, date, time
 from decimal import Decimal
@@ -312,48 +312,152 @@ class SatisfactionResponseFull(BaseModel):
 
 # MNA Schemas
 class MNAResponseCreate(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
     visit_id: int
     # Screening (Q1-Q7)
     q1_food_intake_decline: Optional[str] = None
     q2_weight_loss: Optional[str] = None
     q3_mobility: Optional[str] = None
-    q4_stress_illness: Optional[str] = None
-    q5_neuropsychological: Optional[str] = None
-    q6_bmi: Optional[str] = None
-    q7_calf_circumference: Optional[str] = None
+    q4_stress_illness: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("q4_stress_illness", "q4_psychological_stress"),
+    )
+    q5_neuropsychological: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "q5_neuropsychological", "q5_neuropsychological_problems"
+        ),
+    )
+    q6_bmi: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("q6_bmi", "q6_bmi_or_calf"),
+    )
+    q7_calf_circumference: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "q7_calf_circumference", "q18_calf_circumference"
+        ),
+    )
     # Full Assessment (Q8-Q18)
-    q8_independent_living: Optional[str] = None
-    q9_medications: Optional[str] = None
-    q10_pressure_sores: Optional[str] = None
-    q11_full_meals: Optional[str] = None
-    q12_protein_consumption: Optional[str] = None
-    q13_fruits_vegetables: Optional[str] = None
-    q14_fluid_intake: Optional[str] = None
-    q15_eating_independence: Optional[str] = None
-    q16_self_nutrition: Optional[str] = None
-    q17_health_comparison: Optional[str] = None
-    q18_mid_arm_circumference: Optional[str] = None
+    q8_independent_living: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("q8_independent_living", "q7_independent_living"),
+    )
+    q9_medications: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("q9_medications", "q8_medications"),
+    )
+    q10_pressure_sores: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("q10_pressure_sores", "q9_pressure_ulcers"),
+    )
+    q11_full_meals: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("q11_full_meals", "q10_meals_per_day"),
+    )
+    q12_protein_consumption: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("q12_protein_consumption", "q11_protein_markers"),
+    )
+    q13_fruits_vegetables: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("q13_fruits_vegetables", "q12_fruits_vegetables"),
+    )
+    q14_fluid_intake: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("q14_fluid_intake", "q13_fluid_intake"),
+    )
+    q15_eating_independence: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("q15_eating_independence", "q14_feeding_ability"),
+    )
+    q16_self_nutrition: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("q16_self_nutrition", "q15_self_nutrition_view"),
+    )
+    q17_health_comparison: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("q17_health_comparison", "q16_health_comparison"),
+    )
+    q18_mid_arm_circumference: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "q18_mid_arm_circumference", "q17_mid_arm_circumference"
+        ),
+    )
 
 
 class MNAResponseUpdate(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
     q1_food_intake_decline: Optional[str] = None
     q2_weight_loss: Optional[str] = None
     q3_mobility: Optional[str] = None
-    q4_stress_illness: Optional[str] = None
-    q5_neuropsychological: Optional[str] = None
-    q6_bmi: Optional[str] = None
-    q7_calf_circumference: Optional[str] = None
-    q8_independent_living: Optional[str] = None
-    q9_medications: Optional[str] = None
-    q10_pressure_sores: Optional[str] = None
-    q11_full_meals: Optional[str] = None
-    q12_protein_consumption: Optional[str] = None
-    q13_fruits_vegetables: Optional[str] = None
-    q14_fluid_intake: Optional[str] = None
-    q15_eating_independence: Optional[str] = None
-    q16_self_nutrition: Optional[str] = None
-    q17_health_comparison: Optional[str] = None
-    q18_mid_arm_circumference: Optional[str] = None
+    q4_stress_illness: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("q4_stress_illness", "q4_psychological_stress"),
+    )
+    q5_neuropsychological: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "q5_neuropsychological", "q5_neuropsychological_problems"
+        ),
+    )
+    q6_bmi: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("q6_bmi", "q6_bmi_or_calf"),
+    )
+    q7_calf_circumference: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "q7_calf_circumference", "q18_calf_circumference"
+        ),
+    )
+    q8_independent_living: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("q8_independent_living", "q7_independent_living"),
+    )
+    q9_medications: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("q9_medications", "q8_medications"),
+    )
+    q10_pressure_sores: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("q10_pressure_sores", "q9_pressure_ulcers"),
+    )
+    q11_full_meals: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("q11_full_meals", "q10_meals_per_day"),
+    )
+    q12_protein_consumption: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("q12_protein_consumption", "q11_protein_markers"),
+    )
+    q13_fruits_vegetables: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("q13_fruits_vegetables", "q12_fruits_vegetables"),
+    )
+    q14_fluid_intake: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("q14_fluid_intake", "q13_fluid_intake"),
+    )
+    q15_eating_independence: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("q15_eating_independence", "q14_feeding_ability"),
+    )
+    q16_self_nutrition: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("q16_self_nutrition", "q15_self_nutrition_view"),
+    )
+    q17_health_comparison: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("q17_health_comparison", "q16_health_comparison"),
+    )
+    q18_mid_arm_circumference: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "q18_mid_arm_circumference", "q17_mid_arm_circumference"
+        ),
+    )
 
 
 class MNAResponseFull(BaseModel):

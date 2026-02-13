@@ -35,11 +35,7 @@ export default function SANSAFormPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<SANSAForm>({
+  const { register, handleSubmit } = useForm<SANSAForm>({
     resolver: zodResolver(sansaSchema),
   });
 
@@ -71,29 +67,36 @@ export default function SANSAFormPage() {
       }
 
       // Step 3: Submit SANSA response
-      await apiClient.post("/sansa", {
-        visit_id: visit.id,
-        // Map form field names to match backend schema
-        q1_weight_change: data.q1_weight_change,
-        q2_food_intake: data.q2_food_intake,
-        q3_daily_activities: data.q3_daily_activities,
-        q4_chronic_disease: data.q4_chronic_disease,
-        q5_meals_per_day: data.q5_meals_per_day,
-        q6_portion_size: data.q6_portion_size,
-        q7_food_texture: data.q7_food_texture,
-        q8_rice_starch: data.q8_rice_starch,
-        q9_protein: data.q9_protein,
-        q10_milk: data.q10_milk,
-        q11_fruits: data.q11_fruits,
-        q12_vegetables: data.q12_vegetables,
-        q13_water: data.q13_water,
-        q14_sweet_drinks: data.q14_sweet_drinks,
-        q15_cooking_method: data.q15_cooking_method,
-        q16_oil_coconut: data.q16_oil_coconut,
-      });
+      try {
+        await apiClient.post("/sansa", {
+          visit_id: visit.id,
+          // Map form field names to match backend schema
+          q1_weight_change: data.q1_weight_change,
+          q2_food_intake: data.q2_food_intake,
+          q3_daily_activities: data.q3_daily_activities,
+          q4_chronic_disease: data.q4_chronic_disease,
+          q5_meals_per_day: data.q5_meals_per_day,
+          q6_portion_size: data.q6_portion_size,
+          q7_food_texture: data.q7_food_texture,
+          q8_rice_starch: data.q8_rice_starch,
+          q9_protein: data.q9_protein,
+          q10_milk: data.q10_milk,
+          q11_fruits: data.q11_fruits,
+          q12_vegetables: data.q12_vegetables,
+          q13_water: data.q13_water,
+          q14_sweet_drinks: data.q14_sweet_drinks,
+          q15_cooking_method: data.q15_cooking_method,
+          q16_oil_coconut: data.q16_oil_coconut,
+        });
+      } catch (err: unknown) {
+        const apiError = err as { response?: { data?: { detail?: string } } };
+        const detail = apiError.response?.data?.detail || "";
+        const isDuplicate = detail.toLowerCase().includes("already exists");
+        if (!isDuplicate) throw err;
+      }
 
-      // Redirect to results page with visit ID
-      navigate(`/result/${visit.id}`);
+      // Continue to MNA assessment (respondent flow)
+      navigate(`/mna/${visit.id}`);
     } catch (err: unknown) {
       const error = err as { response?: { data?: { detail?: string } } };
       setError(error.response?.data?.detail || "ไม่สามารถบันทึกข้อมูลได้");
