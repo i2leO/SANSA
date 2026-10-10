@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response, Query
 from sqlalchemy.orm import Session
 from typing import Optional
 import random
@@ -8,6 +8,7 @@ from app.models import Respondent, User
 from app.schemas import (
     RespondentCreate,
     RespondentUpdate,
+    RespondentProfileUpdate,
     RespondentResponse,
     MessageResponse,
 )
@@ -66,6 +67,23 @@ async def create_respondent(
     return new_respondent
 
 
+@router.get("/id/{respondent_id}", response_model=RespondentResponse)
+def get_respondent_by_id(
+    respondent_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_staff_or_admin),
+):
+    """Get respondent by database ID for the staff visit workspace."""
+    respondent = (
+        db.query(Respondent)
+        .filter(Respondent.id == respondent_id, Respondent.is_deleted == False)
+        .first()
+    )
+    if not respondent:
+        raise HTTPException(status_code=404, detail="Respondent not found")
+    return respondent
+
+
 @router.get("/{respondent_code}", response_model=RespondentResponse)
 def get_respondent_by_code(respondent_code: str, db: Session = Depends(get_db)):
     """Get respondent by code (no auth required for self-service)"""
@@ -86,8 +104,9 @@ def get_respondent_by_code(respondent_code: str, db: Session = Depends(get_db)):
 
 @router.get("", response_model=list[RespondentResponse])
 def list_respondents(
-    skip: int = 0,
-    limit: int = 100,
+    response: Response,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=100),
     search: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_staff_or_admin),
@@ -102,7 +121,8 @@ def list_respondents(
             | (Respondent.email.contains(search))
         )
 
-    respondents = query.offset(skip).limit(limit).all()
+    response.headers["X-Total-Count"] = str(query.count())
+    respondents = query.order_by(Respondent.id.desc()).offset(skip).limit(limit).all()
     return respondents
 
 
@@ -130,6 +150,29 @@ async def update_respondent(
     db.commit()
     db.refresh(respondent)
 
+    return respondent
+
+
+@router.put("/{respondent_id}/profile", response_model=RespondentResponse)
+async def complete_respondent_profile(
+    respondent_id: int,
+    profile: RespondentProfileUpdate,
+    db: Session = Depends(get_db),
+):
+    """Save the complete revised4 profile before starting an assessment."""
+    respondent = (
+        db.query(Respondent)
+        .filter(Respondent.id == respondent_id, Respondent.is_deleted == False)
+        .first()
+    )
+    if not respondent:
+        raise HTTPException(status_code=404, detail="Respondent not found")
+
+    data = profile.model_dump(mode="json")
+    for field, value in data.items():
+        setattr(respondent, field, value)
+    db.commit()
+    db.refresh(respondent)
     return respondent
 
 

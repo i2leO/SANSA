@@ -12,6 +12,7 @@ export enum RespondentStatus {
 }
 
 export enum UserRole {
+  USER = "user",
   ADMIN = "admin",
   STAFF = "staff",
 }
@@ -192,6 +193,8 @@ export interface KnowledgePost {
   content?: string;
   summary?: string;
   featured_image_path?: string;
+  media_path?: string;
+  media_type?: 'image' | 'pdf';
   category?: string;
   tags?: string;
   is_published: boolean;

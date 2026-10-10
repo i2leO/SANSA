@@ -3,7 +3,8 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 from typing import Optional
 from app.database import get_db
-from app.models import MNAResponse, Visit, User
+from app.models import BIARecord, MNAResponse, Visit, User
+from app.services.mna_definition import MNA_ITEMS, answers_from_bia
 from app.schemas import (
     MNAResponseCreate,
     MNAResponseUpdate,
@@ -12,16 +13,46 @@ from app.schemas import (
 )
 from app.services.scoring_service import ScoringService
 from app.auth import get_current_staff_or_admin
+from app.services.assessment_revision_service import append_assessment_revision, ensure_assessment_baseline
 
 router = APIRouter(prefix="/mna", tags=["mna"])
 
 
+def present_mna(record):
+    payload = MNAResponseFull.model_validate(record)
+    payload.history_requires_review = record.scoring_version is None or record.scoring_version.instrument_name != "MNA"
+    return payload
+
+
+@router.get("/definition", dependencies=[Depends(get_current_staff_or_admin)])
+def get_mna_definition():
+    scoring = ScoringService(None)
+    return {"items": [
+        {**item, "options": [
+            {**option, "score": scoring.calculate_mna_question_score(index, option["value"])}
+            for option in item["options"]
+        ]} for index, item in enumerate(MNA_ITEMS, 1)
+    ]}
+
+
+@router.get("/visit/{visit_id}/bia-suggestions", dependencies=[Depends(get_current_staff_or_admin)])
+def get_bia_suggestions(visit_id: int, db: Session = Depends(get_db)):
+    bia = db.query(BIARecord).filter(BIARecord.visit_id == visit_id).first()
+    if bia is None:
+        raise HTTPException(status_code=404, detail="ยังไม่มีข้อมูล BIA ที่บันทึกไว้")
+    return {"answers": answers_from_bia(bia)}
+
+
 @router.post("", response_model=MNAResponseFull)
-def create_mna_response(mna_create: MNAResponseCreate, db: Session = Depends(get_db)):
+def create_mna_response(
+    mna_create: MNAResponseCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_staff_or_admin),
+):
     """
     Create MNA (Mini Nutritional Assessment) response with automatic scoring
-    Can be submitted by respondent (no auth) or staff (with auth)
-    Implements conditional logic: assessment questions only if screening ≤11
+    Staff/admin only (router dependencies enforced at app registration).
+    Requires complete A-R answers for a full assessment.
     """
     # Verify visit exists
     visit = db.query(Visit).filter(Visit.id == mna_create.visit_id).first()
@@ -39,18 +70,21 @@ def create_mna_response(mna_create: MNAResponseCreate, db: Session = Depends(get
             status_code=400, detail="MNA response already exists for this visit"
         )
 
-    # Calculate scores
+    # Resolve the instrument version; never attach MNA results to SANSA ID 1.
     scoring_service = ScoringService(db)
+    version = scoring_service.get_active_scoring_version("MNA")
+    if version is None:
+        raise HTTPException(status_code=409, detail="ไม่พบเวอร์ชัน MNA ที่เปิดใช้งาน")
     try:
-        scores = scoring_service.calculate_mna_score(mna_create, version_id=1)
+        scores = scoring_service.calculate_mna_score(mna_create, version_id=version.id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
     # Create response with all 18 question columns
     mna_response = MNAResponse(
         visit_id=mna_create.visit_id,
-        scoring_version_id=1,  # Default to version 1
-        # Screening questions (Q1-Q7) - always required
+        scoring_version_id=version.id,
+        # Screening A-F; preserve the separate historical screening calf slot.
         q1_food_intake_decline=mna_create.q1_food_intake_decline,
         mna_s1=scores.get("mna_s1"),
         q2_weight_loss=mna_create.q2_weight_loss,
@@ -63,9 +97,9 @@ def create_mna_response(mna_create: MNAResponseCreate, db: Session = Depends(get
         mna_s5=scores.get("mna_s5"),
         q6_bmi=mna_create.q6_bmi,
         mna_s6=scores.get("mna_s6"),
-        q7_calf_circumference=mna_create.q7_calf_circumference,
-        mna_s7=scores.get("mna_s7"),
-        # Assessment questions (Q8-Q18) - only if screening ≤11
+        q19_calf_circumference_assess=mna_create.q19_calf_circumference_assess,
+        mna_a12=scores["mna_a12"],
+        # Assessment G-Q; all required for the full A-R instrument.
         q8_independent_living=mna_create.q8_independent_living,
         mna_a1=scores.get("mna_a1"),
         q9_medications=mna_create.q9_medications,
@@ -94,13 +128,16 @@ def create_mna_response(mna_create: MNAResponseCreate, db: Session = Depends(get
         mna_total=scores["mna_total"],
         result_category=scores["result_category"],
         completed_at=datetime.utcnow(),
+        created_by=getattr(current_user, "id", None),
     )
 
     db.add(mna_response)
+    db.flush()
+    append_assessment_revision(db, "MNA", mna_response, current_user, "create")
     db.commit()
     db.refresh(mna_response)
 
-    return mna_response
+    return present_mna(mna_response)
 
 
 @router.get("/{mna_response_id}", response_model=MNAResponseFull)
@@ -113,7 +150,7 @@ def get_mna_response(mna_response_id: int, db: Session = Depends(get_db)):
     if not mna_response:
         raise HTTPException(status_code=404, detail="MNA response not found")
 
-    return mna_response
+    return present_mna(mna_response)
 
 
 @router.get("/visit/{visit_id}", response_model=MNAResponseFull)
@@ -128,7 +165,7 @@ def get_mna_by_visit(visit_id: int, db: Session = Depends(get_db)):
             status_code=404, detail="MNA response not found for this visit"
         )
 
-    return mna_response
+    return present_mna(mna_response)
 
 
 @router.put("/{mna_response_id}", response_model=MNAResponseFull)
@@ -149,59 +186,34 @@ def update_mna_response(
     # Recalculate scores
     scoring_service = ScoringService(db)
 
-    # Build complete MNAResponseCreate from update + existing data
+    version = scoring_service.get_scoring_version(mna_response.scoring_version_id)
+    if version is None or version.instrument_name != "MNA":
+        raise HTTPException(status_code=409, detail="เวอร์ชันคะแนนเดิมไม่ใช่ MNA กรุณาให้ผู้ดูแลตรวจสอบประวัติก่อนแก้ไข")
+    ensure_assessment_baseline(db, "MNA", mna_response)
+    update_data = mna_update.model_dump(exclude_unset=True)
     complete_data = MNAResponseCreate(
         visit_id=mna_response.visit_id,
-        q1_food_intake_decline=mna_update.q1_food_intake_decline
-        or mna_response.q1_food_intake_decline,
-        q2_weight_loss=mna_update.q2_weight_loss or mna_response.q2_weight_loss,
-        q3_mobility=mna_update.q3_mobility or mna_response.q3_mobility,
-        q4_stress_illness=mna_update.q4_stress_illness
-        or mna_response.q4_stress_illness,
-        q5_neuropsychological=mna_update.q5_neuropsychological
-        or mna_response.q5_neuropsychological,
-        q6_bmi=mna_update.q6_bmi or mna_response.q6_bmi,
-        q7_calf_circumference=mna_update.q7_calf_circumference
-        or mna_response.q7_calf_circumference,
-        q8_independent_living=mna_update.q8_independent_living
-        or mna_response.q8_independent_living,
-        q9_medications=mna_update.q9_medications or mna_response.q9_medications,
-        q10_pressure_sores=mna_update.q10_pressure_sores
-        or mna_response.q10_pressure_sores,
-        q11_full_meals=mna_update.q11_full_meals or mna_response.q11_full_meals,
-        q12_protein_consumption=mna_update.q12_protein_consumption
-        or mna_response.q12_protein_consumption,
-        q13_fruits_vegetables=mna_update.q13_fruits_vegetables
-        or mna_response.q13_fruits_vegetables,
-        q14_fluid_intake=mna_update.q14_fluid_intake or mna_response.q14_fluid_intake,
-        q15_eating_independence=mna_update.q15_eating_independence
-        or mna_response.q15_eating_independence,
-        q16_self_nutrition=mna_update.q16_self_nutrition
-        or mna_response.q16_self_nutrition,
-        q17_health_comparison=mna_update.q17_health_comparison
-        or mna_response.q17_health_comparison,
-        q18_mid_arm_circumference=mna_update.q18_mid_arm_circumference
-        or mna_response.q18_mid_arm_circumference,
+        **{item["field"]: update_data.get(item["field"], getattr(mna_response, item["field"]))
+           for item in MNA_ITEMS},
     )
 
     try:
-        scores = scoring_service.calculate_mna_score(complete_data, version_id=1)
+        scores = scoring_service.calculate_mna_score(complete_data, version_id=version.id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
     # Update all fields
-    update_data = mna_update.dict(exclude_unset=True, exclude={"visit_id"})
     for field, value in update_data.items():
         if not field.endswith("_score"):  # Don't manually set scores
             setattr(mna_response, field, value)
 
-    # Update scores (Q1-Q7 use mna_s1-mna_s7, Q8-Q18 use mna_a1-mna_a11)
-    for q_num in range(1, 8):
+    # A-F use mna_s1-s6; G-R use mna_a1-a12.
+    for q_num in range(1, 7):
         score_field = f"mna_s{q_num}"
         if score_field in scores:
             setattr(mna_response, score_field, scores[score_field])
 
-    for q_num in range(8, 19):
+    for q_num in range(8, 20):
         score_field = f"mna_a{q_num - 7}"
         if score_field in scores:
             setattr(mna_response, score_field, scores[score_field])
@@ -211,10 +223,13 @@ def update_mna_response(
     mna_response.mna_total = scores["mna_total"]
     mna_response.result_category = scores["result_category"]
 
+    db.flush()
+    append_assessment_revision(db, "MNA", mna_response, current_user, "update")
+
     db.commit()
     db.refresh(mna_response)
 
-    return mna_response
+    return present_mna(mna_response)
 
 
 @router.delete("/{mna_response_id}", response_model=MessageResponse)
@@ -231,10 +246,7 @@ def delete_mna_response(
     if not mna_response:
         raise HTTPException(status_code=404, detail="MNA response not found")
 
-    db.delete(mna_response)
-    db.commit()
-
-    return {"message": "MNA response deleted successfully"}
+    raise HTTPException(status_code=409, detail="ข้อมูลวิจัย MNA ห้ามลบ กรุณาบันทึกการแก้ไขเป็น revision ใหม่")
 
 
 @router.get("/{mna_response_id}/advice")
@@ -263,7 +275,9 @@ def get_mna_advice(mna_response_id: int, db: Session = Depends(get_db)):
         },
     }
 
-    advice = advice_map.get(mna_response.result_category, advice_map["normal"])
+    advice = advice_map.get(mna_response.result_category)
+    if advice is None:
+        raise HTTPException(status_code=409, detail="ยังไม่มีผล MNA ที่แปลผลได้")
 
     return {
         "result_category": mna_response.result_category,

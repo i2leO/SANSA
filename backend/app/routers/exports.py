@@ -10,6 +10,15 @@ from app.auth import get_current_staff_or_admin
 router = APIRouter(prefix="/exports", tags=["exports"])
 
 
+def csv_download(content: str, filename: str) -> Response:
+    """Mark UTF-8 CSV for Excel without changing exported values or columns."""
+    return Response(
+        content=b"\xef\xbb\xbf" + content.encode("utf-8"),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
 @router.get("/sansa.csv")
 def export_sansa(
     start_date: Optional[date] = None,
@@ -22,13 +31,7 @@ def export_sansa(
     export_service = ExportService(db)
     csv_content = export_service.export_sansa_csv(start_date, end_date, facility_id)
 
-    return Response(
-        content=csv_content,
-        media_type="text/csv",
-        headers={
-            "Content-Disposition": f"attachment; filename=sansa_export_{date.today().isoformat()}.csv"
-        },
-    )
+    return csv_download(csv_content, f"sansa_export_{date.today().isoformat()}.csv")
 
 
 @router.get("/mna.csv")
@@ -42,11 +45,35 @@ def export_mna(
     export_service = ExportService(db)
     csv_content = export_service.export_mna_csv(start_date, end_date)
 
+    return csv_download(csv_content, f"mna_export_{date.today().isoformat()}.csv")
+
+
+@router.get("/prediction.csv")
+def export_prediction(
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_staff_or_admin),
+):
+    export_service = ExportService(db)
+    csv_content = export_service.export_prediction_csv(start_date, end_date)
+    return csv_download(csv_content, f"prediction_export_{date.today().isoformat()}.csv")
+
+
+@router.get("/revised4.xlsx")
+def export_revised4_workbook(
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_staff_or_admin),
+):
+    content = ExportService(db).export_revised4_xlsx(start_date, end_date)
     return Response(
-        content=csv_content,
-        media_type="text/csv",
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={
-            "Content-Disposition": f"attachment; filename=mna_export_{date.today().isoformat()}.csv"
+            "Content-Disposition":
+                f"attachment; filename=sansa_revised4_{date.today().isoformat()}.xlsx"
         },
     )
 
@@ -62,13 +89,7 @@ def export_bia(
     export_service = ExportService(db)
     csv_content = export_service.export_bia_csv(start_date, end_date)
 
-    return Response(
-        content=csv_content,
-        media_type="text/csv",
-        headers={
-            "Content-Disposition": f"attachment; filename=bia_export_{date.today().isoformat()}.csv"
-        },
-    )
+    return csv_download(csv_content, f"bia_export_{date.today().isoformat()}.csv")
 
 
 @router.get("/satisfaction.csv")
@@ -82,13 +103,7 @@ def export_satisfaction(
     export_service = ExportService(db)
     csv_content = export_service.export_satisfaction_csv(start_date, end_date)
 
-    return Response(
-        content=csv_content,
-        media_type="text/csv",
-        headers={
-            "Content-Disposition": f"attachment; filename=satisfaction_export_{date.today().isoformat()}.csv"
-        },
-    )
+    return csv_download(csv_content, f"satisfaction_export_{date.today().isoformat()}.csv")
 
 
 @router.get("/combined.csv")
@@ -102,10 +117,14 @@ def export_combined(
     export_service = ExportService(db)
     csv_content = export_service.export_combined_csv(start_date, end_date)
 
-    return Response(
-        content=csv_content,
-        media_type="text/csv",
-        headers={
-            "Content-Disposition": f"attachment; filename=combined_export_{date.today().isoformat()}.csv"
-        },
-    )
+    return csv_download(csv_content, f"combined_export_{date.today().isoformat()}.csv")
+
+
+@router.get("/assessment-history.csv")
+def export_assessment_history(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_staff_or_admin),
+):
+    """Export every immutable MNA/BIA revision for longitudinal audit."""
+    content = ExportService(db).export_assessment_history_csv()
+    return csv_download(content, f"assessment_history_{date.today().isoformat()}.csv")

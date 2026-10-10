@@ -43,7 +43,12 @@ uploads/
 # Alembic
 backend/alembic/versions/*.py
 !backend/alembic/versions/.gitkeep
+!backend/alembic/versions/20260912_01_sansa_prediction_results.py
 
 # Frontend
 .vite/
 coverage/
+
+!backend/alembic/versions/20260913_02_respondent_qr.py
+!backend/alembic/versions/20260915_03_user_role.py
+!backend/alembic/versions/20260928_04_knowledge_media.py

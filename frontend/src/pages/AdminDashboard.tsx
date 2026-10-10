@@ -1,127 +1,27 @@
-import AdminLayout from "@/pages/admin/AdminLayout";
-import { useAuthStore } from "@/stores/authStore";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from 'react';
+import apiClient from '@/lib/api';
+import AdminIcon from '@/pages/admin/AdminIcon';
+import AdminLayout from '@/pages/admin/AdminLayout';
+import { adminMenu } from '@/pages/admin/adminMenu';
+import { useAuthStore } from '@/stores/authStore';
+import { Link } from 'react-router-dom';
 
-function AdminDashboard() {
+export default function AdminDashboard() {
   const { user } = useAuthStore();
-  const navigate = useNavigate();
-
-  return (
-    <AdminLayout title="แดชบอร์ด">
-      <div className="mb-8">
-        <h2 className="text-xl font-semibold text-gray-800 mb-2">ยินดีต้อนรับ!</h2>
-        <p className="text-gray-600">เลือกเมนูด้านล่างเพื่อจัดการข้อมูลและการตั้งค่าระบบ</p>
-      </div>
-
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div className="bg-white rounded-xl shadow-lg p-6 border-2 border-primary-200 hover:border-primary-400 transition-all">
-          <div className="text-4xl mb-3">👥</div>
-          <h3 className="text-xl font-semibold mb-2 text-gray-800">ผู้เข้าร่วมการประเมิน</h3>
-          <p className="text-gray-600 mb-4">จัดการข้อมูลผู้เข้าร่วมและผลการประเมิน</p>
-          <button
-            onClick={() => navigate("/admin/respondents")}
-            className="text-primary-600 hover:text-primary-700 font-medium"
-          >
-            ดูทั้งหมด →
-          </button>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-lg p-6 border-2 border-primary-200 hover:border-primary-400 transition-all">
-          <div className="text-4xl mb-3">📊</div>
-          <h3 className="text-xl font-semibold mb-2 text-gray-800">ส่งออกข้อมูล</h3>
-          <p className="text-gray-600 mb-4">ส่งออกข้อมูลสำหรับวิเคราะห์ใน SPSS</p>
-          <button
-            onClick={() => navigate("/admin/exports")}
-            className="text-primary-600 hover:text-primary-700 font-medium"
-          >
-            ส่งออกข้อมูล →
-          </button>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-lg p-6 border-2 border-primary-200 hover:border-primary-400 transition-all">
-          <div className="text-4xl mb-3">📚</div>
-          <h3 className="text-xl font-semibold mb-2 text-gray-800">เนื้อหาความรู้</h3>
-          <p className="text-gray-600 mb-4">จัดการบทความและข้อมูลความรู้</p>
-          <button
-            onClick={() => navigate("/admin/knowledge")}
-            className="text-primary-600 hover:text-primary-700 font-medium"
-          >
-            จัดการ →
-          </button>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-lg p-6 border-2 border-primary-200 hover:border-primary-400 transition-all">
-          <div className="text-4xl mb-3">🏥</div>
-          <h3 className="text-xl font-semibold mb-2 text-gray-800">ศูนย์บริการสุขภาพ</h3>
-          <p className="text-gray-600 mb-4">จัดการข้อมูลศูนย์บริการสาธารณสุข</p>
-          <button
-            onClick={() => navigate("/admin/facilities")}
-            className="text-primary-600 hover:text-primary-700 font-medium"
-          >
-            จัดการ →
-          </button>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-lg p-6 border-2 border-primary-200 hover:border-primary-400 transition-all">
-          <div className="text-4xl mb-3">⚙️</div>
-          <h3 className="text-xl font-semibold mb-2 text-gray-800">กฎการให้คะแนน</h3>
-          <p className="text-gray-600 mb-4">ตั้งค่าเกณฑ์การประเมินผล</p>
-          <button
-            onClick={() => navigate("/admin/scoring")}
-            className="text-primary-600 hover:text-primary-700 font-medium"
-          >
-            ตั้งค่า →
-          </button>
-        </div>
-
-        {user?.role === "admin" && (
-          <div className="bg-white rounded-xl shadow-lg p-6 border-2 border-primary-200 hover:border-primary-400 transition-all">
-            <div className="text-4xl mb-3">👨‍💼</div>
-            <h3 className="text-xl font-semibold mb-2 text-gray-800">จัดการผู้ใช้</h3>
-            <p className="text-gray-600 mb-4">จัดการบัญชีเจ้าหน้าที่และสิทธิ์</p>
-            <button
-              onClick={() => navigate("/admin/users")}
-              className="text-primary-600 hover:text-primary-700 font-medium"
-            >
-              จัดการผู้ใช้ →
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Quick Stats */}
-      <div className="mt-12">
-        <h2 className="text-xl font-semibold text-gray-800 mb-4">สถิติรวม</h2>
-        <div className="grid md:grid-cols-4 gap-4">
-          <div className="bg-white rounded-lg shadow p-6 text-center border-l-4 border-primary-600">
-            <p className="text-3xl font-bold text-primary-700">0</p>
-            <p className="text-gray-600 mt-2">ผู้เข้าร่วมทั้งหมด</p>
-          </div>
-          <div className="bg-white rounded-lg shadow p-6 text-center border-l-4 border-green-600">
-            <p className="text-3xl font-bold text-green-700">0</p>
-            <p className="text-gray-600 mt-2">การประเมินวันนี้</p>
-          </div>
-          <div className="bg-white rounded-lg shadow p-6 text-center border-l-4 border-blue-600">
-            <p className="text-3xl font-bold text-blue-700">0</p>
-            <p className="text-gray-600 mt-2">บทความความรู้</p>
-          </div>
-          <div className="bg-white rounded-lg shadow p-6 text-center border-l-4 border-orange-600">
-            <p className="text-3xl font-bold text-orange-700">0</p>
-            <p className="text-gray-600 mt-2">ศูนย์บริการ</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-12 text-center">
-        <button
-          onClick={() => navigate("/")}
-          className="text-primary-600 hover:text-primary-700 font-medium"
-        >
-          ← กลับไปหน้าหลัก
-        </button>
-      </div>
-    </AdminLayout>
-  );
+  const [stats, setStats] = useState<number[] | null>(null);
+  const [statsError, setStatsError] = useState(false);
+  useEffect(() => { let active = true; apiClient.get<{respondents:number;visits_today:number;knowledge:number;facilities:number}>('/admin/dashboard').then(({data}) => { if(active) setStats([data.respondents,data.visits_today,data.knowledge,data.facilities]); }).catch(() => { if(active) setStatsError(true); }); return () => {active=false;}; }, []);
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'สวัสดีตอนเช้า' : hour < 17 ? 'สวัสดีตอนบ่าย' : 'สวัสดีตอนเย็น';
+  const targets=[200,50,30,20];
+  return <AdminLayout title="ภาพรวมระบบ">
+    <section className="sansa-banner p-7 md:p-9 mb-7"><div className="relative"><h2 className="text-2xl md:text-3xl font-bold">☀ {greeting}, {user?.full_name || user?.username}!</h2><p className="mt-3 text-white/90">ยินดีต้อนรับสู่ระบบจัดการ SANSA — เลือกเมนูด้านล่างเพื่อจัดการข้อมูล</p></div></section>
+    <section aria-label="สถิติระบบ" className="grid sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-8">
+      {['ผู้เข้าร่วมทั้งหมด','การประเมินวันนี้','บทความความรู้','ศูนย์บริการ'].map((label,index) => <div key={label} className={`sansa-panel sansa-stat-card stat-${index}`}><div><p>{stats?.[index] ?? "—"}</p><h2>{label}</h2><small>{statsError ? "โหลดสถิติไม่สำเร็จ" : stats ? "ข้อมูลล่าสุด" : "กำลังโหลด…"}</small></div><span>{stats?.[index] ?? "—"}<small>/ {targets[index]}</small></span></div>)}
+    </section>
+    <h2 className="font-bold text-lg text-primary-600 mb-5">เมนูจัดการ</h2>
+    <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-5">
+      {adminMenu.filter(item => item.path !== 'users' || user?.role === 'admin').map(item => <Link key={item.path} to={`/admin/${item.path}`} className="sansa-panel sansa-tile p-6"><span aria-hidden className={`sansa-menu-icon sansa-icon-${item.color}`}><AdminIcon name={item.path} /></span><h3 className="font-bold text-lg mt-4">{item.heading}</h3><p className="text-sm text-slate-500 mt-2">{item.detail}</p></Link>)}
+    </div>
+  </AdminLayout>;
 }
-
-export default AdminDashboard;

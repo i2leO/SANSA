@@ -49,7 +49,7 @@ export default function AdminLoginPage() {
       });
 
       login(userResponse.data, access_token, refresh_token);
-      navigate("/admin/dashboard");
+      navigate(userResponse.data.role === 'user' ? '/' : '/admin/dashboard');
     } catch (err: unknown) {
       const error = err as { response?: { data?: { detail?: string } } };
       setError(error.response?.data?.detail || "ไม่สามารถเข้าสู่ระบบได้");

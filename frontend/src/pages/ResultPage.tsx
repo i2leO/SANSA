@@ -2,232 +2,58 @@ import apiClient from "@/lib/api";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
-interface SANSAResult {
-  id: number;
-  screening_total: number;
-  diet_total: number;
-  total_score: number;
-  result_level: string;
-  completed_at: string;
-}
+interface ParticipantResult { predicted_group: string | null; ready: boolean; }
+interface KnowledgeItem { id: number; slug: string; title: string; summary?: string | null; featured_image_path?: string | null; media_path?: string | null; }
+
+const groupLabel = (group: string | null) => ({ UNDER: "ขาด/เสี่ยงขาด", NORMAL: "ปกติ", OVER: "เสี่ยงเกิน/เกิน" }[group || ""] || "กำลังรอข้อมูล");
+const recommendationSlugs: Record<string, { missions: string[]; knowledge: string[] }> = {
+  UNDER: { missions: ["nutrition-mission-07", "nutrition-mission-10", "nutrition-mission-09"], knowledge: ["nutrition-60plus-01", "nutrition-60plus-06", "nutrition-60plus-02"] },
+  NORMAL: { missions: ["nutrition-mission-01", "nutrition-mission-05", "nutrition-mission-06"], knowledge: ["nutrition-60plus-11", "nutrition-60plus-13", "nutrition-60plus-14"] },
+  OVER: { missions: ["nutrition-mission-02", "nutrition-mission-03", "nutrition-mission-08"], knowledge: ["nutrition-60plus-09", "nutrition-60plus-07", "nutrition-60plus-08"] },
+};
 
 export default function ResultPage() {
   const { visitId } = useParams();
   const navigate = useNavigate();
-  const [result, setResult] = useState<SANSAResult | null>(null);
+  const [result, setResult] = useState<ParticipantResult | null>(null);
+  const [knowledge, setKnowledge] = useState<KnowledgeItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    const fetchResult = async () => {
+    let active = true;
+    const load = async () => {
       try {
-        const response = await apiClient.get(`/sansa/visit/${visitId}`);
-        setResult(response.data);
+        const [resultResponse, knowledgeResponse] = await Promise.all([
+          apiClient.post<ParticipantResult>(`/sansa/visit/${visitId}/participant-result`),
+          apiClient.get<KnowledgeItem[]>("/knowledge"),
+        ]);
+        if (active) { setResult(resultResponse.data); setKnowledge(knowledgeResponse.data); }
       } catch (err: unknown) {
-        const error = err as { response?: { data?: { detail?: string } } };
-        setError(error.response?.data?.detail || "ไม่สามารถโหลดผลการประเมินได้");
-      } finally {
-        setLoading(false);
-      }
+        const failure = err as { response?: { data?: { detail?: string } } };
+        if (active) setError(failure.response?.data?.detail || "ไม่สามารถโหลดผลการประเมินได้");
+      } finally { if (active) setLoading(false); }
     };
-
-    if (visitId) {
-      fetchResult();
-    }
+    if (visitId) void load();
+    return () => { active = false; };
   }, [visitId]);
 
-  const normalizeLevel = (level: string | null | undefined) =>
-    (level || "").toString().trim().toLowerCase().replace(/_/g, "-");
+  if (loading) return <main className="min-h-screen grid place-items-center bg-teal-50"><p className="text-xl text-slate-600">กำลังคำนวณผลการประเมิน…</p></main>;
+  if (error || !result) return <main className="min-h-screen grid place-items-center bg-teal-50 px-4"><section className="max-w-md rounded-3xl bg-white p-8 text-center shadow-xl"><h1 className="text-2xl font-bold text-red-700">ยังแสดงผลไม่ได้</h1><p className="mt-3 text-slate-600">{error || "ไม่พบผลการประเมิน"}</p><button onClick={() => navigate(`/bia/${visitId}`)} className="sansa-primary-button mt-6 w-full">กลับไปกรอกเส้นรอบเอว</button></section></main>;
 
-  const getResultLabel = (level: string | null | undefined) => {
-    switch (normalizeLevel(level)) {
-      case "normal":
-      case "ปกติ":
-        return "ปกติ";
-      case "at-risk":
-      case "เสี่ยง":
-        return "เสี่ยง";
-      case "malnourished":
-      case "ขาดสารอาหาร":
-        return "ขาดสารอาหาร";
-      default:
-        return level?.toString().trim() || "-";
-    }
-  };
+  const group = result.predicted_group || "";
+  const selected = recommendationSlugs[group];
+  const missions = selected ? selected.missions.map(slug => knowledge.find(item => item.slug === slug)).filter((item): item is KnowledgeItem => Boolean(item)) : [];
+  const reading = selected ? selected.knowledge.map(slug => knowledge.find(item => item.slug === slug)).filter((item): item is KnowledgeItem => Boolean(item)) : [];
+  const openMedia = (item: KnowledgeItem) => item.media_path && window.open(item.media_path, "_blank", "noopener,noreferrer");
 
-  const getResultColor = (level: string | null | undefined) => {
-    switch (normalizeLevel(level)) {
-      case "normal":
-      case "ปกติ":
-        return "from-green-500 to-teal-600";
-      case "at-risk":
-      case "at_risk":
-      case "เสี่ยง":
-        return "from-yellow-500 to-orange-600";
-      case "malnourished":
-      case "ขาดสารอาหาร":
-        return "from-red-500 to-pink-600";
-      default:
-        return "from-gray-500 to-gray-600";
-    }
-  };
-
-  const getResultEmoji = (level: string | null | undefined) => {
-    switch (normalizeLevel(level)) {
-      case "normal":
-      case "ปกติ":
-        return "✅";
-      case "at-risk":
-      case "at_risk":
-      case "เสี่ยง":
-        return "⚠️";
-      case "malnourished":
-      case "ขาดสารอาหาร":
-        return "⚠️";
-      default:
-        return "📊";
-    }
-  };
-
-  const getRecommendation = (level: string | null | undefined) => {
-    switch (normalizeLevel(level)) {
-      case "normal":
-      case "ปกติ":
-        return "สถานะโภชนาการของคุณอยู่ในเกณฑ์ดี ควรรักษาพฤติกรรมการกินอาหารและการใช้ชีวิตที่ดีต่อไป";
-      case "at-risk":
-      case "at_risk":
-      case "เสี่ยง":
-        return "คุณมีความเสี่ยงต่อภาวะทุพโภชนาการ แนะนำให้ปรับปรุงพฤติกรรมการกินอาหาร และปรึกษานักโภชนาการหรือแพทย์";
-      case "malnourished":
-      case "ขาดสารอาหาร":
-        return "คุณอาจมีภาวะทุพโภชนาการ ควรปรึกษานักโภชนาการหรือแพทย์โดยเร็วเพื่อรับคำแนะนำที่เหมาะสม";
-      default:
-        return "ผลการประเมินของคุณได้รับการบันทึกเรียบร้อยแล้ว";
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-primary-50 to-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-6xl mb-4 animate-bounce">⏳</div>
-          <p className="text-xl text-gray-600">กำลังคำนวณผลการประเมิน...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error || !result) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-primary-50 to-white flex items-center justify-center px-4">
-        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md">
-          <div className="text-6xl mb-4 text-center">❌</div>
-          <h1 className="text-2xl font-bold text-red-600 mb-4 text-center">เกิดข้อผิดพลาด</h1>
-          <p className="text-gray-600 mb-6 text-center">{error}</p>
-          <button
-            onClick={() => navigate("/")}
-            className="w-full py-3 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-semibold"
-          >
-            กลับหน้าหลัก
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-white py-8">
-      <div className="container mx-auto px-4 max-w-4xl">
-        {/* Header */}
-        <div className="bg-white rounded-2xl shadow-xl p-8 mb-6">
-          <div className="text-center mb-6">
-            <div className="text-7xl mb-4">{getResultEmoji(result.result_level)}</div>
-            <h1 className="text-4xl font-bold text-primary-700 mb-2">ผลการประเมิน SANSA</h1>
-            <p className="text-gray-600">ขอบคุณที่ทำแบบประเมินครบถ้วน</p>
-          </div>
-        </div>
-
-        {/* Score Card */}
-        <div
-          className={`bg-gradient-to-br ${getResultColor(
-            result.result_level,
-          )} rounded-2xl shadow-xl p-8 mb-6 text-white`}
-        >
-          <h2 className="text-3xl font-bold mb-6 text-center">คะแนนของคุณ</h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-            <div className="bg-white/20 backdrop-blur-sm rounded-xl p-6 text-center">
-              <div className="text-5xl font-bold mb-2">{result.screening_total}</div>
-              <div className="text-sm opacity-90">คะแนนคัดกรอง</div>
-            </div>
-
-            <div className="bg-white/20 backdrop-blur-sm rounded-xl p-6 text-center">
-              <div className="text-5xl font-bold mb-2">{result.diet_total}</div>
-              <div className="text-sm opacity-90">คะแนนพฤติกรรม</div>
-            </div>
-
-            <div className="bg-white/20 backdrop-blur-sm rounded-xl p-6 text-center">
-              <div className="text-5xl font-bold mb-2">{result.total_score}</div>
-              <div className="text-sm opacity-90">คะแนนรวม</div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl p-6 text-center">
-            <div className="text-2xl font-bold text-gray-800 mb-2">
-              สถานะโภชนาการ:{" "}
-              <span
-                className={`bg-gradient-to-r ${getResultColor(
-                  result.result_level,
-                )} bg-clip-text text-transparent`}
-              >
-                {getResultLabel(result.result_level)}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Recommendations */}
-        <div className="bg-white rounded-2xl shadow-xl p-8 mb-6">
-          <div className="flex items-start gap-4">
-            <div className="text-4xl">💡</div>
-            <div className="flex-1">
-              <h3 className="text-2xl font-bold text-primary-700 mb-3">คำแนะนำ</h3>
-              <p className="text-gray-700 text-lg leading-relaxed">
-                {getRecommendation(result.result_level)}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="bg-white rounded-2xl shadow-xl p-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <button
-              onClick={() => navigate("/")}
-              className="flex-1 py-4 bg-gradient-to-r from-primary-600 to-teal-600 text-white rounded-xl hover:from-primary-700 hover:to-teal-700 font-bold text-lg shadow-lg"
-            >
-              เสร็จสิ้น → กลับหน้าหลัก
-            </button>
-            <button
-              onClick={() => navigate(-1)}
-              className="flex-1 py-4 border-2 border-primary-600 text-primary-700 rounded-xl hover:bg-primary-50 font-bold text-lg"
-            >
-              ย้อนกลับ
-            </button>
-          </div>
-        </div>
-
-        {/* Progress Bar */}
-        <div className="mt-8 text-center text-gray-600">
-          <p className="text-sm mb-2">ขั้นตอนที่ 5 จาก 5 | ผลการประเมิน</p>
-          <div className="w-full bg-gray-200 rounded-full h-2">
-            <div
-              className="bg-gradient-to-r from-primary-600 to-teal-600 h-2 rounded-full transition-all"
-              style={{ width: "100%" }}
-            ></div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  return <main className="min-h-screen bg-gradient-to-br from-teal-50 via-white to-cyan-50 py-8"><div className="mx-auto max-w-4xl px-4">
+    <section className="rounded-3xl bg-white p-8 text-center shadow-xl"><h1 className="text-4xl font-bold text-teal-800">ผลการประเมิน SANSA</h1><p className="mt-2 text-slate-600">ขอบคุณที่ทำแบบประเมินครบถ้วน</p></section>
+    <section className="mt-6 rounded-3xl border border-teal-100 bg-white p-8 text-center shadow-xl" aria-label="ผล SANSA Model 3"><p className="text-lg font-semibold text-teal-700">ผล SANSA Model 3</p>{result.ready ? <h2 className="mt-4 text-5xl font-bold text-slate-900">{groupLabel(group)}</h2> : <><h2 className="mt-4 text-3xl font-bold text-amber-700">ข้อมูลยังไม่ครบ</h2><button onClick={() => navigate(`/bia/${visitId}`)} className="sansa-primary-button mt-6">กรอกเส้นรอบเอว</button></>}</section>
+    {result.ready && (missions.length > 0 || reading.length > 0) && <section className="mt-6 rounded-3xl border border-teal-100 bg-white p-6 shadow-xl" aria-label="คำแนะนำเฉพาะบุคคล">
+      {missions.length > 0 && <><h3 className="mb-3 text-xl font-bold">Mission วันนี้</h3><div className="grid gap-4 sm:grid-cols-3">{missions.map(item => <button key={item.id} onClick={() => openMedia(item)} className="overflow-hidden rounded-2xl border border-teal-100 bg-teal-50 text-left hover:shadow-lg">{item.featured_image_path && <img src={item.featured_image_path} alt="" className="aspect-square w-full object-cover" />}<span className="block p-4"><strong className="block text-lg text-teal-900">{item.title.replace("MISSION วันนี้: ", "")}</strong><span className="mt-1 block text-sm text-slate-600">{item.summary}</span></span></button>)}</div></>}
+      {reading.length > 0 && <><h3 className="mb-3 mt-7 text-xl font-bold">อ่านเพิ่มเติม</h3><div className="grid gap-4 sm:grid-cols-2">{reading.slice(0, 2).map(item => <button key={item.id} onClick={() => openMedia(item)} className="flex items-center gap-4 rounded-2xl border border-slate-200 p-3 text-left hover:border-teal-400">{item.featured_image_path && <img src={item.featured_image_path} alt="" className="h-24 w-24 rounded-xl object-cover" />}<strong className="text-lg">{item.title}</strong></button>)}</div></>}
+    </section>}
+    <div className="mt-6 grid gap-3 sm:grid-cols-2"><button onClick={() => navigate(`/satisfaction/${visitId}`)} className="sansa-primary-button py-4">ประเมินความพึงพอใจ</button><button onClick={() => navigate("/")} className="rounded-xl border-2 border-teal-700 py-4 font-bold text-teal-800">กลับหน้าหลัก</button></div>
+  </div></main>;
 }

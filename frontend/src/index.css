@@ -66,3 +66,131 @@ body.large-text-mode textarea {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
+
+/* SANSA theme aligned with the deployed public and administration pages. */
+:root { font-family: 'Noto Sans Thai', Tahoma, system-ui, sans-serif; color: #172033; background: #f8fafb; }
+body { margin: 0; min-width: 320px; }
+a, button { -webkit-tap-highlight-color: transparent; }
+a:focus-visible, button:focus-visible, input:focus-visible { outline: 3px solid #0f8587; outline-offset: 4px; }
+.sansa-home { background: #fafafa; }
+.sansa-public-header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 1rem max(1.25rem, calc((100vw - 1440px) / 2)); background: white; border-bottom: 1px solid #e3f4f4; }
+.sansa-brand-icon { display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; width: 48px; height: 48px; border-radius: 15px; color: white; background: linear-gradient(135deg, #19cece, #109392); box-shadow: 0 2px 3px #0f766e20; }
+.sansa-panel { background-color: white; border: 1px solid #e0e7ef; border-radius: 20px; box-shadow: 0 2px 3px #1720330c; }
+.sansa-tile { transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+.sansa-tile:hover { transform: translateY(-3px); border-color: #8cdddc; box-shadow: 0 8px 24px #0f766e0c; }
+.sansa-banner { position: relative; overflow: hidden; border-radius: 20px; background: linear-gradient(115deg, #19cdcd, #10928f); color: white; }
+.sansa-banner::before, .sansa-banner::after { content: ''; position: absolute; border-radius: 50%; background: #ffffff20; width: 160px; height: 160px; pointer-events: none; }
+.sansa-banner::before { left: -65px; bottom: -95px; }
+.sansa-banner::after { right: -60px; top: -70px; width: 200px; height: 200px; }
+.sansa-admin { min-height: 100vh; background: #f7f9fb; }
+.sansa-sidebar { width: 264px; position: fixed; inset: 0 auto 0 0; display: flex; flex-direction: column; padding: 16px; background: white; border-right: 1px solid #e0e7ef; z-index: 20; overflow-y: auto; }
+.sansa-admin-nav { display: flex; flex-direction: column; gap: 7px; margin: 20px 0; }
+.sansa-admin-nav a { display: flex; align-items: center; gap: 16px; padding: 14px 18px; color: #697c95; border-radius: 14px; font-weight: 500; }
+.sansa-admin-nav a span { font-size: 24px; width: 24px; text-align: center; line-height: 1; }
+.sansa-admin-nav a:hover { background: #effbfb; color: #087d80; }
+.sansa-admin-nav a.active { background: #16c9c6; color: #073e42; font-weight: 700; }
+.sansa-admin-workspace { margin-left: 264px; }
+.sansa-admin-header { min-height: 80px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 32px; background: white; border-bottom: 1px solid #e0e7ef; }
+.sansa-admin-search { width: min(620px,55%); height: 48px; display: flex; align-items: center; gap: 12px; padding: 0 16px; border: 1px solid #dce5ee; border-radius: 14px; background: #f8fafc; color: #91a0b4; }
+.sansa-admin-search input { width: 100%; border: 0; outline: 0; background: transparent; color: #172033; }
+.sansa-header-actions { display: flex; align-items: center; gap: 14px; }
+.sansa-header-icon { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 10px; color: #657991; font-size: 22px; }
+.sansa-header-icon:hover { background: #effbfb; color: #087d80; }
+.sansa-header-icon i { position: absolute; right: 7px; top: 6px; width: 8px; height: 8px; border-radius: 50%; background: #18c8c4; }
+.sansa-notification-popover { position: absolute; z-index: 30; right: 0; top: 48px; width: 230px; padding: 16px; border: 1px solid #dce5ee; border-radius: 14px; background: white; box-shadow: 0 12px 30px #17203320; font-size: 14px; }
+.sansa-notification-popover p { margin-top: 8px; color: #697c95; }
+.sansa-avatar { display: flex; align-items: center; justify-content: center; width: 42px; height: 42px; flex-shrink: 0; border-radius: 50%; color: white; background: linear-gradient(135deg,#17c7c6,#0d9190); font-size: 14px; font-weight: 600; }
+.sansa-menu-icon { display: inline-flex; align-items: center; justify-content: center; height: 50px; width: 50px; border-radius: 15px; font-size: 27px; }
+.sansa-icon-teal { background: #eafffc; color: #0b9998; }
+.sansa-icon-blue { background: #eff6ff; color: #3b82f6; }
+.sansa-icon-amber { background: #fffbeb; color: #d97706; }
+.sansa-icon-rose { background: #fff1f2; color: #f43f5e; }
+.sansa-icon-slate { background: #f1f5f9; color: #64748b; }
+.sansa-icon-violet { background: #f3eefe; color: #8b5cf6; }
+.sansa-page-heading { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
+.sansa-page-heading-icon { display: inline-flex; align-items: center; justify-content: center; width: 52px; height: 52px; flex-shrink: 0; border-radius: 15px; color: #0a9897; background: #e9fbfa; }
+.sansa-page-heading h1 { font-size: 25px; line-height: 1.25; font-weight: 700; color: #172033; }
+.sansa-page-heading p { margin-top: 5px; color: #73839a; }
+.sansa-create-panel { overflow: hidden; }
+.sansa-create-toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 20px 24px; color: #172033; font-size: 17px; font-weight: 700; }
+.sansa-create-toggle span:first-child { display: flex; align-items: center; gap: 12px; }
+.sansa-create-toggle b { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 11px; background: #e9fbfa; color: #0a9897; font-size: 21px; }
+.sansa-create-body { padding: 22px 24px; border-top: 1px solid #edf1f5; background: #fbfdfd; }
+.sansa-list-heading { display: flex; align-items: center; justify-content: space-between; min-height: 70px; padding: 16px 24px; border-bottom: 1px solid #edf1f5; }
+.sansa-list-heading > div { display: flex; align-items: center; gap: 12px; }
+.sansa-list-heading h2 { font-size: 18px; font-weight: 700; }
+.sansa-list-heading div > span { padding: 4px 10px; border-radius: 999px; background: #e9fbfa; color: #087d80; font-size: 12px; font-weight: 600; }
+.sansa-list-heading button { color: #0a9292; font-weight: 600; }
+.sansa-table-search { margin: 18px 24px 10px; height: 46px; display: flex; align-items: center; gap: 10px; padding: 0 15px; border: 1px solid #dce5ee; border-radius: 12px; color: #91a0b4; }
+.sansa-table-search input { flex: 1; min-width: 0; border: 0 !important; outline: 0; background: transparent; }
+.sansa-table-pagination { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 24px; border-top: 1px solid #edf1f5; color: #73839a; font-size: 13px; }
+.sansa-table-pagination > div { display: flex; align-items: center; gap: 9px; }
+.sansa-table-pagination select,.sansa-table-pagination button { min-height: 34px; padding: 5px 10px; border: 1px solid #dce5ee; border-radius: 8px; background: white; }
+.sansa-table-pagination button:disabled { opacity: .35; }
+.sansa-export-grid { display: grid; gap: 16px; }
+.sansa-export-card { width: 100%; padding: 20px 22px; border: 1px solid #e0e7ef; border-radius: 18px; background: white; text-align: left; box-shadow: 0 2px 4px #17203308; }
+.sansa-export-card > div { gap: 16px; }
+.sansa-export-card:hover { border-color: #8cdddc; background: #fbffff; }
+.sansa-export-card:disabled { opacity: .55; }
+.sansa-export-action { color: #087d80; font-size: 14px; font-weight: 700; }
+.sansa-stat-card { min-height: 138px; display: flex; align-items: center; justify-content: space-between; padding: 24px; border-top: 4px solid #16c9c6; }
+.sansa-stat-card > div > p { font-size: 32px; font-weight: 800; }
+.sansa-stat-card h2 { color: #667890; }
+.sansa-stat-card small { color: #9aa7b7; font-size: 11px; }
+.sansa-stat-card > span { width: 68px; height: 68px; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 6px solid #dfe5ea; border-top-color: currentColor; border-radius: 50%; color: #16c9c6; font-size: 19px; font-weight: 700; }
+.sansa-stat-card > span small { font-size: 10px; font-weight: 500; }
+.sansa-stat-card.stat-1 { border-top-color:#059669; }.sansa-stat-card.stat-1 > span { color:#059669; }
+.sansa-stat-card.stat-2 { border-top-color:#3b82f6; }.sansa-stat-card.stat-2 > span { color:#3b82f6; }
+.sansa-stat-card.stat-3 { border-top-color:#d97706; }.sansa-stat-card.stat-3 > span { color:#d97706; }
+.sansa-facility-layout { display:grid; grid-template-columns:minmax(320px, .9fr) minmax(420px, 1.4fr); gap:20px; align-items:start; }
+.sansa-facility-list { display:grid; gap:12px; max-height:680px; overflow:auto; padding:2px; }
+.sansa-facility-card { overflow:hidden; border-radius:16px; }
+.sansa-facility-card.selected { border-color:#17b8b5; box-shadow:0 0 0 2px #17b8b518; }
+.sansa-facility-card > button { width:100%; display:flex; align-items:flex-start; gap:14px; padding:17px; text-align:left; }
+.sansa-facility-card b { display:block; color:#172033; }
+.sansa-facility-card small { display:block; margin-top:5px; color:#73839a; line-height:1.55; }
+.sansa-facility-card > div { display:flex; flex-wrap:wrap; gap:16px; padding:0 17px 15px 81px; color:#087d80; font-size:13px; font-weight:600; }
+.sansa-map-panel { position:sticky; top:20px; overflow:hidden; }
+.sansa-map-panel > div { padding:20px 22px; }
+.sansa-map-panel h2 { font-size:19px; font-weight:700; }
+.sansa-map-panel p { margin-top:5px; color:#73839a; font-size:14px; }
+.sansa-map-panel iframe { width:100%; height:520px; border:0; border-top:1px solid #e0e7ef; }
+@media (max-width: 767px) {
+  .sansa-sidebar { position: static; width: auto; padding: 8px 16px 16px; }
+  .sansa-sidebar > a { padding: 8px; }
+  .sansa-admin-nav { flex-direction: row; overflow-x: auto; margin: 8px 0 16px; gap: 6px; }
+  .sansa-admin-nav a { white-space: nowrap; padding: 10px 12px; font-size: 14px; }
+  .sansa-admin-nav a span { font-size: 18px; }
+  .sansa-admin-workspace { margin-left: 0; }
+  .sansa-admin-header { min-height: 64px; padding: 14px 20px; }
+  .sansa-admin-search { width: 100%; }
+  .sansa-header-actions .hidden { display: none; }
+  .sansa-page-heading h1 { font-size: 22px; }
+  .sansa-table-pagination { align-items: flex-start; flex-direction: column; }
+  .sansa-list-heading button span,.sansa-export-action { display: none; }
+  .sansa-facility-layout { grid-template-columns:1fr; }
+  .sansa-facility-list { max-height:none; }
+  .sansa-map-panel { position:static; }
+  .sansa-map-panel iframe { height:360px; }
+}
+@media (prefers-reduced-motion: reduce) { .sansa-tile { transition: none; } .sansa-tile:hover { transform: none; } }
+
+/* Shared inner-page treatment, including assessment and administration menus. */
+.sansa-public-page { background: #f8fafb; }
+.sansa-search { width: 100%; border: 1px solid #dce5ee; border-radius: 12px; padding: 12px 16px; background: white; color: #172033; }
+.sansa-primary-button { padding: 12px 20px; border-radius: 12px; background: #0d9293; color: white; font-weight: 600; }
+.sansa-primary-button:hover { background: #08787a; }
+.sansa-primary-button:disabled { opacity: .5; cursor: not-allowed; }
+.sansa-admin main > div:has(> h1), .sansa-admin main > div > div:has(> h1) { padding-bottom: 12px; }
+.sansa-admin main .bg-white.rounded-xl { border-radius: 18px; border-color: #e0e7ef; box-shadow: 0 2px 4px #17203308; }
+.sansa-admin main table thead { background: #f5f8fb; }
+.sansa-admin main table th { color: #697c95; font-size: 12px; font-weight: 600; padding: 16px; }
+.sansa-admin main table td { padding: 16px; border-color: #edf1f5; }
+.sansa-admin main table tbody tr:hover { background: #f3fcfc; }
+.sansa-admin main input:not([type=checkbox]):not([type=radio]), .sansa-admin main textarea, .sansa-admin main select { border-width: 1px; border-color: #dce5ee; border-radius: 12px; }
+.sansa-assessment { background: #f8fafb; }
+.sansa-assessment > .min-h-screen { background: transparent; }
+.sansa-assessment .bg-white { border-color: #e1e9ef; }
+.sansa-assessment .shadow-lg { box-shadow: 0 3px 10px #17203308; }
+.sansa-assessment .rounded-xl { border-radius: 18px; }
+.sansa-question-image { display:block; width:min(100%,480px); max-height:340px; object-fit:contain; margin:0 0 16px; border:1px solid #e0e7ef; border-radius:14px; background:#fff; }

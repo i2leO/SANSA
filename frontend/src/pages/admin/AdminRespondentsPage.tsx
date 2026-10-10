@@ -1,7 +1,9 @@
+import TableControls from '@/components/TableControls';
 import apiClient from "@/lib/api";
 import AdminLayout from "@/pages/admin/AdminLayout";
+import { AdminCreatePanel, AdminListHeader, AdminPageHeader } from "@/pages/admin/AdminPageUI";
 import { Respondent } from "@/types";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 function getErrorDetail(err: unknown, fallback: string) {
@@ -19,53 +21,44 @@ export default function AdminRespondentsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [refreshKey,setRefreshKey]=useState(0);
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return respondents;
-    return respondents.filter((r) => r.respondent_code.toLowerCase().includes(q));
-  }, [respondents, search]);
+  const [page,setPage]=useState(0);
+  const [size,setSize]=useState(10);
+  const [total,setTotal]=useState(0);
+  const [creating,setCreating]=useState(false);
+  const createRespondent=async()=>{setCreating(true);try {const {data}=await apiClient.post<Respondent>('/respondents',{});navigate(`/admin/respondents/${data.respondent_code}`);}catch {setError('สร้างผู้เข้าร่วมไม่สำเร็จ');}finally {setCreating(false);}};
 
   useEffect(() => {
+    let active=true;
     const load = async () => {
       setLoading(true);
       setError(null);
       try {
-        const res = await apiClient.get<Respondent[]>("/respondents");
-        setRespondents(res.data);
+        const res = await apiClient.get<Respondent[]>("/respondents", {params:{skip:page*size,limit:size,search}});
+        if(active){setRespondents(res.data);setTotal(Number(res.headers["x-total-count"] || 0));}
       } catch (err: unknown) {
-        setError(getErrorDetail(err, "ไม่สามารถโหลดรายชื่อผู้เข้าร่วมได้"));
+        if(active)setError(getErrorDetail(err, "ไม่สามารถโหลดรายชื่อผู้เข้าร่วมได้"));
       } finally {
-        setLoading(false);
+        if(active)setLoading(false);
       }
     };
-    load();
-  }, []);
+    void load();
+    return()=>{active=false;};
+  }, [page,size,search,refreshKey]);
 
   return (
     <AdminLayout title="ผู้เข้าร่วมการประเมิน">
-      <div className="flex items-center justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">ผู้เข้าร่วมการประเมิน</h1>
-          <p className="text-gray-600">คลิกเพื่อดูรายละเอียดผู้เข้าร่วมและการประเมิน</p>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-xl shadow p-4 mb-4 border border-gray-200">
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="ค้นหารหัสผู้เข้าร่วม (เช่น R001 หรือ RES...)"
-          className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
-        />
-      </div>
-
-      <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
+      <AdminPageHeader icon="respondents" title="ผู้เข้าร่วมการประเมิน" description="จัดการข้อมูลผู้เข้าร่วม การประเมิน และ QR Code สำหรับเข้าใช้งาน" />
+      <AdminCreatePanel title="เพิ่มผู้เข้าร่วมเพื่อออก QR"><p className="text-sm text-slate-500 mb-4">ระบบจะสร้างรหัสผู้เข้าร่วมใหม่ จากนั้นคุณสามารถออก QR Code ที่หน้ารายละเอียดได้</p><button className="sansa-primary-button" onClick={createRespondent} disabled={creating}>{creating?'กำลังสร้าง…':'สร้างผู้เข้าร่วม'}</button></AdminCreatePanel>
+      <div className="sansa-panel overflow-hidden mt-6">
+        <AdminListHeader title="รายชื่อผู้เข้าร่วม" total={total} onRefresh={()=>setRefreshKey(value=>value+1)} />
+        <TableControls search={search} onSearch={s=>{setSearch(s);setPage(0);}} page={page} onPage={setPage} size={size} onSize={n=>{setSize(n);setPage(0);}} total={total} />
         {loading ? (
           <div className="p-6 text-gray-600">กำลังโหลด...</div>
         ) : error ? (
           <div className="p-6 text-red-700">{error}</div>
-        ) : filtered.length === 0 ? (
+        ) : respondents.length === 0 ? (
           <div className="p-6 text-gray-600">ไม่พบข้อมูล</div>
         ) : (
           <div className="overflow-x-auto">
@@ -80,7 +73,7 @@ export default function AdminRespondentsPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((r) => (
+                {respondents.map((r) => (
                   <tr key={r.id} className="border-t hover:bg-primary-50/50">
                     <td className="px-4 py-3 font-mono font-semibold">{r.respondent_code}</td>
                     <td className="px-4 py-3">{r.age ?? "-"}</td>
@@ -100,6 +93,7 @@ export default function AdminRespondentsPage() {
             </table>
           </div>
         )}
+        <TableControls search={search} onSearch={s=>{setSearch(s);setPage(0);}} page={page} onPage={setPage} size={size} onSize={n=>{setSize(n);setPage(0);}} total={total} mode="pagination" />
       </div>
     </AdminLayout>
   );

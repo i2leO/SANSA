@@ -1,36 +1,64 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import apiClient from "../lib/api";
+import { displayResearchValue } from '@/lib/researchLabels';
 
-export default function BIAMeasurementPage() {
+export default function BIAMeasurementPage({ staffMode = false, embedded = false, onSaved }: { staffMode?: boolean; embedded?: boolean; onSaved?: () => void }) {
   const { visitId } = useParams();
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   // Form state for BIA measurements
   const [formData, setFormData] = useState({
-    age: "",
-    sex: "male",
     waist_circumference_cm: "",
     weight_kg: "",
     height_cm: "",
     fat_mass_kg: "",
     body_fat_percentage: "",
-    visceral_fat_kg: "",
+    visceral_fat_level: "",
     muscle_mass_kg: "",
     bone_mass_kg: "",
     water_percentage: "",
     metabolic_rate: "",
-    weight_management: "",
-    food_recommendation: "",
-    staff_signature: "",
+    mac_cm: "",
+    cc_cm: "",
   });
 
   const [bmi, setBmi] = useState<number | null>(null);
   const [bmiCategory, setBmiCategory] = useState<string>("");
 
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setLoadFailed(false);
+    setError(null); setSaved(false);
+    setBmi(null); setBmiCategory('');
+    setFormData(previous => Object.fromEntries(Object.keys(previous).map(key => [key, ''])) as typeof previous);
+    const load = async () => {
+      try {
+        const { data } = await apiClient.get(`/bia/visit/${visitId}`);
+        if (!active) return;
+        setFormData(previous => Object.fromEntries(Object.keys(previous).map(key => [key, data[key] == null ? '' : String(data[key])])) as typeof previous);
+        setBmi(data.bmi == null ? null : Number(data.bmi));
+        setBmiCategory(displayResearchValue('bmi_category', data.bmi_category));
+      } catch (e: unknown) {
+        if (!active) return;
+        if ((e as { response?: { status?: number } }).response?.status !== 404) {
+          setLoadFailed(true);
+          setError('โหลดข้อมูลเดิมไม่สำเร็จ กรุณาเปิดหน้านี้ใหม่ก่อนบันทึก');
+        }
+      } finally { if (active) setLoading(false); }
+    };
+    void load();
+    return () => { active = false; };
+  }, [visitId]);
+
   const handleChange = (field: string, value: string) => {
+    setSaved(false);
     setFormData((prev) => ({ ...prev, [field]: value }));
 
     // Auto-calculate BMI when weight or height changes
@@ -43,78 +71,65 @@ export default function BIAMeasurementPage() {
         const calculatedBmi = weight / (heightM * heightM);
         setBmi(calculatedBmi);
 
-        // Determine BMI category (Asian-Pacific thresholds)
-        if (calculatedBmi < 18.5) {
-          setBmiCategory("ผอม (Underweight)");
-        } else if (calculatedBmi < 23) {
-          setBmiCategory("ปกติ (Normal)");
-        } else if (calculatedBmi < 25) {
-          setBmiCategory("เกิน (Overweight)");
-        } else if (calculatedBmi < 30) {
-          setBmiCategory("อ้วนระดับ 1 (Obese I)");
-        } else {
-          setBmiCategory("อ้วนระดับ 2 (Obese II)");
-        }
-      }
+        setBmiCategory('จะแสดงหลังบันทึก');
+      } else { setBmi(null); setBmiCategory(''); }
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading || loadFailed || isSubmitting) return;
     setError(null);
     setIsSubmitting(true);
 
-    // Validate required fields
-    if (!formData.weight_kg || !formData.height_cm) {
-      setError("กรุณากรอกน้ำหนักและส่วนสูง");
+    const requiredFields = Object.entries(formData).filter(([, value]) => value.trim() === "");
+    if (requiredFields.length > 0) {
+      setError("กรุณากรอกข้อมูล BIA และสัดส่วนร่างกายให้ครบทุกช่อง");
       setIsSubmitting(false);
       return;
     }
 
     try {
       // Submit BIA record
-      await apiClient.post("/bia", {
-        visit_id: parseInt(visitId || "0"),
-        age: formData.age ? parseInt(formData.age) : null,
-        sex: formData.sex,
-        waist_circumference_cm: formData.waist_circumference_cm
-          ? parseFloat(formData.waist_circumference_cm)
-          : null,
+      const response = await apiClient.request({
+        method: 'put',
+        url: `/bia/visit/${visitId}/staff`,
+        data: {
+        waist_circumference_cm: parseFloat(formData.waist_circumference_cm),
         weight_kg: parseFloat(formData.weight_kg),
         height_cm: parseFloat(formData.height_cm),
-        fat_mass_kg: formData.fat_mass_kg ? parseFloat(formData.fat_mass_kg) : null,
-        body_fat_percentage: formData.body_fat_percentage
-          ? parseFloat(formData.body_fat_percentage)
-          : null,
-        visceral_fat_kg: formData.visceral_fat_kg ? parseFloat(formData.visceral_fat_kg) : null,
-        muscle_mass_kg: formData.muscle_mass_kg ? parseFloat(formData.muscle_mass_kg) : null,
-        bone_mass_kg: formData.bone_mass_kg ? parseFloat(formData.bone_mass_kg) : null,
-        water_percentage: formData.water_percentage ? parseFloat(formData.water_percentage) : null,
-        metabolic_rate: formData.metabolic_rate ? parseInt(formData.metabolic_rate) : null,
-        weight_management: formData.weight_management || null,
-        food_recommendation: formData.food_recommendation || null,
-        staff_signature: formData.staff_signature || null,
+        fat_mass_kg: parseFloat(formData.fat_mass_kg),
+        body_fat_percentage: parseFloat(formData.body_fat_percentage),
+        visceral_fat_level: parseFloat(formData.visceral_fat_level),
+        muscle_mass_kg: parseFloat(formData.muscle_mass_kg),
+        bone_mass_kg: parseFloat(formData.bone_mass_kg),
+        water_percentage: parseFloat(formData.water_percentage),
+        metabolic_rate: parseInt(formData.metabolic_rate),
+        mac_cm: parseFloat(formData.mac_cm),
+        cc_cm: parseFloat(formData.cc_cm),
+        },
       });
 
       // Continue to satisfaction survey
-      navigate(`/satisfaction/${visitId}`);
-    } catch (err: any) {
-      console.error("Error submitting BIA record:", err);
-      const detail = err?.response?.data?.detail;
-      const isDuplicate =
-        typeof detail === "string" && detail.toLowerCase().includes("already exists");
-      if (isDuplicate) {
-        navigate(`/satisfaction/${visitId}`);
-        return;
-      }
-      setError(detail || "เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาลองใหม่อีกครั้ง");
+      setBmi(response.data.bmi == null ? null : Number(response.data.bmi));
+      setBmiCategory(displayResearchValue('bmi_category', response.data.bmi_category));
+      setSaved(true);
+      if (embedded) onSaved?.();
+      else navigate(staffMode ? `/admin/results/${visitId}` : `/satisfaction/${visitId}`);
+    } catch (err: unknown) {
+      const detail = (err as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
+      setError(typeof detail === 'string' ? detail : "เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาตรวจสอบค่าที่กรอกแล้วลองใหม่อีกครั้ง");
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  if (loading) return <p className="p-8">กำลังโหลดข้อมูลเดิม...</p>;
+  if (loadFailed) return <p role="alert" className="p-8 text-red-700">{error}</p>;
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50 py-8">
+    <div className={embedded ? '' : 'min-h-screen bg-gradient-to-br from-teal-50 via-cyan-50 to-blue-50 py-8'}>
+      {saved && <p role="status" className="my-3 text-emerald-700">บันทึก BIA แล้ว</p>}
       <div className="container mx-auto px-4 max-w-4xl">
         {/* Header */}
         <div className="mb-8 text-center">
@@ -166,36 +181,15 @@ export default function BIAMeasurementPage() {
             <div className="p-6 bg-gradient-to-r from-teal-50 to-cyan-50 rounded-xl border-2 border-teal-100">
               <h2 className="text-xl font-semibold text-gray-800 mb-4">ข้อมูลพื้นฐาน</h2>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">อายุ (ปี)</label>
-                  <input
-                    type="number"
-                    value={formData.age}
-                    onChange={(e) => handleChange("age", e.target.value)}
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:ring-2 focus:ring-teal-200"
-                    placeholder="เช่น 65"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">เพศ</label>
-                  <select
-                    value={formData.sex}
-                    onChange={(e) => handleChange("sex", e.target.value)}
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:ring-2 focus:ring-teal-200"
-                  >
-                    <option value="male">ชาย</option>
-                    <option value="female">หญิง</option>
-                  </select>
-                </div>
-
+              <div className="grid grid-cols-1 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    เส้นรอบเอว (cm)
+                    เส้นรอบเอว (cm) <span className="text-red-600">*</span>
                   </label>
+                  <img className="sansa-question-image" src="/question-images/wc_cm.jpg" alt="ภาพประกอบวิธีวัดเส้นรอบเอว" loading="lazy" />
                   <input
                     type="number"
+                    required
                     step="0.1"
                     value={formData.waist_circumference_cm}
                     onChange={(e) => handleChange("waist_circumference_cm", e.target.value)}
@@ -268,10 +262,11 @@ export default function BIAMeasurementPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    มวลไขมัน (kg)
+                    มวลไขมัน (kg) <span className="text-red-600">*</span>
                   </label>
                   <input
                     type="number"
+                    required
                     step="0.1"
                     value={formData.fat_mass_kg}
                     onChange={(e) => handleChange("fat_mass_kg", e.target.value)}
@@ -282,10 +277,11 @@ export default function BIAMeasurementPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    เปอร์เซ็นต์ไขมัน (%)
+                    เปอร์เซ็นต์ไขมัน (%) <span className="text-red-600">*</span>
                   </label>
                   <input
                     type="number"
+                    required
                     step="0.1"
                     value={formData.body_fat_percentage}
                     onChange={(e) => handleChange("body_fat_percentage", e.target.value)}
@@ -295,25 +291,17 @@ export default function BIAMeasurementPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    ไขมันในช่องท้อง (kg)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={formData.visceral_fat_kg}
-                    onChange={(e) => handleChange("visceral_fat_kg", e.target.value)}
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:ring-2 focus:ring-teal-200"
-                    placeholder="เช่น 2.5"
-                  />
+                  <label className="block text-sm font-medium text-gray-700 mb-2">ระดับไขมันในช่องท้อง <span className="text-red-600">*</span></label>
+                  <input type="number" required step="0.1" value={formData.visceral_fat_level} onChange={(e) => handleChange("visceral_fat_level", e.target.value)} className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:ring-2 focus:ring-teal-200" placeholder="เช่น 8" />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    มวลกล้ามเนื้อ (kg)
+                    มวลกล้ามเนื้อ (kg) <span className="text-red-600">*</span>
                   </label>
                   <input
                     type="number"
+                    required
                     step="0.1"
                     value={formData.muscle_mass_kg}
                     onChange={(e) => handleChange("muscle_mass_kg", e.target.value)}
@@ -324,10 +312,11 @@ export default function BIAMeasurementPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    มวลกระดูก (kg)
+                    มวลกระดูก (kg) <span className="text-red-600">*</span>
                   </label>
                   <input
                     type="number"
+                    required
                     step="0.1"
                     value={formData.bone_mass_kg}
                     onChange={(e) => handleChange("bone_mass_kg", e.target.value)}
@@ -338,10 +327,11 @@ export default function BIAMeasurementPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    เปอร์เซ็นต์น้ำ (%)
+                    เปอร์เซ็นต์น้ำ (%) <span className="text-red-600">*</span>
                   </label>
                   <input
                     type="number"
+                    required
                     step="0.1"
                     value={formData.water_percentage}
                     onChange={(e) => handleChange("water_percentage", e.target.value)}
@@ -352,64 +342,26 @@ export default function BIAMeasurementPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    อัตราการเผาผลาญพลังงาน (kcal/day)
+                    อัตราการเผาผลาญพลังงาน (kcal/day) <span className="text-red-600">*</span>
                   </label>
                   <input
                     type="number"
+                    required
                     value={formData.metabolic_rate}
                     onChange={(e) => handleChange("metabolic_rate", e.target.value)}
                     className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:ring-2 focus:ring-teal-200"
                     placeholder="เช่น 1450"
                   />
                 </div>
-              </div>
-            </div>
 
-            {/* Section 4: Recommendations */}
-            <div className="p-6 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl border-2 border-indigo-100">
-              <h2 className="text-xl font-semibold text-gray-800 mb-4">คำแนะนำ</h2>
-
-              <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    การจัดการน้ำหนัก
-                  </label>
-                  <select
-                    value={formData.weight_management}
-                    onChange={(e) => handleChange("weight_management", e.target.value)}
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:ring-2 focus:ring-teal-200"
-                  >
-                    <option value="">-- เลือก --</option>
-                    <option value="maintain">คงไว้</option>
-                    <option value="decrease">ลดน้ำหนัก</option>
-                    <option value="increase">เพิ่มน้ำหนัก</option>
-                  </select>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">เส้นรอบวงแขน (MAC) (ซม.) <span className="text-red-600">*</span></label>
+                  <input type="number" required step="0.1" value={formData.mac_cm} onChange={(e) => handleChange("mac_cm", e.target.value)} className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:ring-2 focus:ring-teal-200" placeholder="เช่น 24.5" />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    คำแนะนำด้านอาหาร
-                  </label>
-                  <textarea
-                    value={formData.food_recommendation}
-                    onChange={(e) => handleChange("food_recommendation", e.target.value)}
-                    rows={4}
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:ring-2 focus:ring-teal-200"
-                    placeholder="คำแนะนำด้านการรับประทานอาหารและโภชนาการ..."
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    ผู้บันทึกข้อมูล
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.staff_signature}
-                    onChange={(e) => handleChange("staff_signature", e.target.value)}
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:ring-2 focus:ring-teal-200"
-                    placeholder="ชื่อผู้บันทึกข้อมูล (ถ้ามี)"
-                  />
+                  <label className="block text-sm font-medium text-gray-700 mb-2">เส้นรอบวงน่อง (CC) (ซม.) <span className="text-red-600">*</span></label>
+                  <input type="number" required step="0.1" value={formData.cc_cm} onChange={(e) => handleChange("cc_cm", e.target.value)} className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-teal-500 focus:ring-2 focus:ring-teal-200" placeholder="เช่น 32.0" />
                 </div>
               </div>
             </div>

@@ -25,6 +25,15 @@ class FoodDiaryEntryCreate(BaseModel):
     portion_description: Optional[str] = None
 
 
+class FoodDiaryEntryUpdate(BaseModel):
+    entry_date: Optional[date] = None
+    entry_time: Optional[time] = None
+    meal_type: Optional[str] = None
+    menu_name: Optional[str] = None
+    description: Optional[str] = None
+    portion_description: Optional[str] = None
+
+
 class FoodDiaryPhotoResponse(BaseModel):
     id: int
     file_path: str
@@ -116,6 +125,30 @@ async def get_food_diary_entry(
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
 
+    return entry
+
+
+@router.put("/{entry_id}", response_model=FoodDiaryEntryResponse)
+async def update_food_diary_entry(
+    entry_id: int,
+    payload: FoodDiaryEntryUpdate,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user_optional),
+):
+    """Update one food diary item without replacing its photos."""
+    entry = db.execute(
+        select(FoodDiaryEntry).where(FoodDiaryEntry.id == entry_id)
+    ).scalar_one_or_none()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+
+    values = payload.model_dump(exclude_unset=True)
+    if "menu_name" in values and not (values["menu_name"] or "").strip():
+        raise HTTPException(status_code=422, detail="Menu name is required")
+    for field, value in values.items():
+        setattr(entry, field, value)
+    db.commit()
+    db.refresh(entry)
     return entry
 
 

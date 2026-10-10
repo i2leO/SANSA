@@ -1,437 +1,101 @@
 import apiClient from "@/lib/api";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
 import { z } from "zod";
 
-const foodDiarySchema = z.object({
-  entry_date: z.string().min(1, "กรุณาเลือกวันที่"),
+const schema = z.object({
   entry_time: z.string().optional(),
-  meal_type: z.enum([
-    "breakfast",
-    "morning_snack",
-    "lunch",
-    "afternoon_snack",
-    "dinner",
-    "before_bed",
-    "other",
-  ]),
-  menu_name: z.string().min(1, "กรุณาระบุชื่อเมนู"),
-  description: z.string().optional(),
+  meal_type: z.enum(["breakfast", "morning_snack", "lunch", "afternoon_snack", "dinner", "before_bed", "other"]),
+  menu_name: z.string().min(1, "กรุณาระบุชื่ออาหาร"),
   portion_description: z.string().optional(),
+  description: z.string().optional(),
 });
+type FormData = z.infer<typeof schema>;
+type Entry = FormData & { id:number; entry_date:string; photos:Array<{id:number;file_path:string;original_filename:string}> };
 
-type FoodDiaryForm = z.infer<typeof foodDiarySchema>;
+const today = () => new Date().toISOString().slice(0, 10);
+const shiftDate = (value:string, amount:number) => {
+  const date = new Date(`${value}T12:00:00`);
+  date.setDate(date.getDate() + amount);
+  return date.toISOString().slice(0, 10);
+};
+const meals = [
+  {key:"breakfast", icon:"🌅", label:"มื้อเช้า"},
+  {key:"lunch", icon:"☀️", label:"มื้อกลางวัน"},
+  {key:"dinner", icon:"🌙", label:"มื้อเย็น"},
+] as const;
+const snackFor:Record<string,{key:FormData["meal_type"];label:string}> = {
+  breakfast:{key:"morning_snack",label:"เพิ่มของว่างเช้า"},
+  lunch:{key:"afternoon_snack",label:"เพิ่มของว่างบ่าย"},
+};
 
-interface FoodDiaryEntry {
-  id: number;
-  entry_date: string;
-  entry_time: string;
-  meal_type: string;
-  menu_name: string;
-  description: string;
-  portion_description: string;
-  photos: Array<{
-    id: number;
-    file_path: string;
-    original_filename: string;
-  }>;
-}
+export default function FoodDiaryPage(){
+  const {respondentCode}=useParams();
+  const navigate=useNavigate();
+  const [visitId,setVisitId]=useState<number|null>(null);
+  const [entries,setEntries]=useState<Entry[]>([]);
+  const [selectedDate,setSelectedDate]=useState(today());
+  const [editing,setEditing]=useState<Entry|null>(null);
+  const [formMeal,setFormMeal]=useState<FormData["meal_type"]>("breakfast");
+  const [open,setOpen]=useState(false);
+  const [busy,setBusy]=useState(false);
+  const [loading,setLoading]=useState(true);
+  const [error,setError]=useState<string|null>(null);
+  const {register,handleSubmit,reset,formState:{errors}}=useForm<FormData>({resolver:zodResolver(schema)});
 
-export default function FoodDiaryPage() {
-  const { respondentCode } = useParams();
-  const navigate = useNavigate();
-  const [entries, setEntries] = useState<FoodDiaryEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [visitId, setVisitId] = useState<number | null>(null);
-
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = useForm<FoodDiaryForm>({
-    resolver: zodResolver(foodDiarySchema),
-    defaultValues: {
-      entry_date: new Date().toISOString().split("T")[0],
-      entry_time: new Date().toTimeString().slice(0, 5),
-      meal_type: "breakfast",
-    },
-  });
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // Get respondent to find visit
-        const respondentRes = await apiClient.get(`/respondents/${respondentCode}`);
-        const respondent = respondentRes.data;
-
-        // Get visits for this respondent
-        const visitsRes = await apiClient.get(`/visits/respondent/${respondent.id}`);
-        if (visitsRes.data.length > 0) {
-          const latestVisit = visitsRes.data[0];
-          setVisitId(latestVisit.id);
-
-          // Get food diary entries (endpoint needs to be created)
-          try {
-            const entriesRes = await apiClient.get(`/food-diary/visit/${latestVisit.id}`);
-            setEntries(entriesRes.data);
-          } catch (err) {
-            // No entries yet or endpoint doesn't exist
-            setEntries([]);
-          }
-        }
-      } catch (err) {
-        console.error("Error fetching data:", err);
-        setError("ไม่สามารถโหลดข้อมูลได้");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (respondentCode) {
-      fetchData();
-    }
-  }, [respondentCode]);
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      setSelectedFiles(Array.from(e.target.files));
-    }
+  const reload=async(id:number)=>{
+    const response=await apiClient.get<Entry[]>(`/food-diary/visit/${id}`);
+    setEntries(response.data);
   };
+  useEffect(()=>{let active=true;(async()=>{try{
+    const respondent=await apiClient.get(`/respondents/${respondentCode}`);
+    const visits=await apiClient.get(`/visits/respondent/${respondent.data.id}`);
+    if(!visits.data.length) throw new Error("ยังไม่มีรอบการประเมินสำหรับผู้ใช้นี้");
+    const id=visits.data[0].id; if(!active)return; setVisitId(id); await reload(id);
+  }catch(err){if(active)setError(err instanceof Error?err.message:"ไม่สามารถโหลดบันทึกอาหารได้");}finally{if(active)setLoading(false);}})();return()=>{active=false};},[respondentCode]);
 
-  const onSubmit = async (data: FoodDiaryForm) => {
-    if (!visitId) {
-      setError("ไม่พบข้อมูล visit กรุณาลองใหม่");
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      // Create food diary entry
-      const entryRes = await apiClient.post("/food-diary", {
-        visit_id: visitId,
-        ...data,
-      });
-
-      const entryId = entryRes.data.id;
-
-      // Upload photos if any
-      if (selectedFiles.length > 0) {
-        const formData = new FormData();
-        selectedFiles.forEach((file) => {
-          formData.append("files", file);
-        });
-
-        await apiClient.post(`/food-diary/${entryId}/photos`, formData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
-      }
-
-      // Refresh entries
-      const entriesRes = await apiClient.get(`/food-diary/visit/${visitId}`);
-      setEntries(entriesRes.data);
-
-      // Reset form
-      reset();
-      setSelectedFiles([]);
-      setShowAddForm(false);
-    } catch (err: unknown) {
-      const errorMessage =
-        err instanceof Error && "response" in err
-          ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
-          : undefined;
-      setError(errorMessage || "ไม่สามารถบันทึกข้อมูลได้");
-    } finally {
-      setLoading(false);
-    }
+  const dayEntries=useMemo(()=>entries.filter(item=>item.entry_date===selectedDate),[entries,selectedDate]);
+  const completed=meals.filter(meal=>dayEntries.some(item=>item.meal_type===meal.key)).length;
+  const openForm=(meal:FormData["meal_type"],entry?:Entry)=>{
+    setFormMeal(meal); setEditing(entry||null);
+    reset(entry?{entry_time:entry.entry_time?.slice(0,5)||"",meal_type:entry.meal_type,menu_name:entry.menu_name,portion_description:entry.portion_description||"",description:entry.description||""}:{entry_time:new Date().toTimeString().slice(0,5),meal_type:meal,menu_name:"",portion_description:"",description:""});
+    setOpen(true);
   };
+  const submit=async(data:FormData)=>{if(!visitId)return;setBusy(true);setError(null);try{
+    const payload={...data,meal_type:formMeal,entry_date:selectedDate,visit_id:visitId};
+    if(editing) await apiClient.put(`/food-diary/${editing.id}`,payload); else await apiClient.post("/food-diary",payload);
+    await reload(visitId); setOpen(false); setEditing(null);
+  }catch{setError("บันทึกรายการไม่สำเร็จ กรุณาลองใหม่");}finally{setBusy(false);}};
+  const remove=async(id:number)=>{if(!confirm("ลบรายการอาหารนี้หรือไม่?"))return;try{await apiClient.delete(`/food-diary/${id}`);setEntries(items=>items.filter(item=>item.id!==id));}catch{setError("ลบรายการไม่สำเร็จ");}};
+  const copyYesterday=async(meal:string)=>{if(!visitId)return;const source=entries.filter(item=>item.entry_date===shiftDate(selectedDate,-1)&&item.meal_type===meal);if(!source.length)return;setBusy(true);try{for(const item of source){await apiClient.post("/food-diary",{visit_id:visitId,entry_date:selectedDate,entry_time:item.entry_time,meal_type:item.meal_type,menu_name:item.menu_name,description:item.description,portion_description:item.portion_description});}await reload(visitId);}catch{setError("คัดลอกรายการจากเมื่อวานไม่สำเร็จ");}finally{setBusy(false);}};
 
-  const handleDelete = async (entryId: number) => {
-    if (!confirm("ต้องการลบรายการนี้?")) return;
-
-    try {
-      await apiClient.delete(`/food-diary/${entryId}`);
-      setEntries(entries.filter((e) => e.id !== entryId));
-    } catch (err: unknown) {
-      setError("ไม่สามารถลบรายการได้");
-    }
-  };
-
-  const getMealTypeLabel = (type: string) => {
-    const labels: Record<string, string> = {
-      breakfast: "🌅 มื้อเช้า",
-      morning_snack: "☕ ของว่างเช้า",
-      lunch: "🍱 มื้อกลางวัน",
-      afternoon_snack: "🍪 ของว่างบ่าย",
-      dinner: "🌙 มื้อเย็น",
-      before_bed: "🌃 ก่อนนอน",
-      other: "🍽️ อื่นๆ",
-    };
-    return labels[type] || type;
-  };
-
-  if (loading && !showAddForm) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-primary-50 to-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-6xl mb-4 animate-bounce">⏳</div>
-          <p className="text-xl text-gray-600">กำลังโหลดข้อมูล...</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-white py-8">
-      <div className="container mx-auto px-4 max-w-5xl">
-        {/* Header */}
-        <div className="bg-white rounded-2xl shadow-xl p-8 mb-6">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="w-16 h-16 bg-gradient-to-br from-orange-500 to-red-600 rounded-2xl flex items-center justify-center">
-              <span className="text-3xl">📔</span>
-            </div>
-            <div>
-              <h1 className="text-4xl font-bold text-gray-800">บันทึกการกินอาหาร</h1>
-              <p className="text-gray-600 mt-1">Food Diary - บันทึกอาหารประจำวัน</p>
-            </div>
-          </div>
-          <div className="border-t border-gray-200 pt-4 mt-4">
-            <p className="text-gray-700">
-              รหัสผู้เข้าร่วม:{" "}
-              <span className="font-mono font-bold text-primary-600 text-xl">{respondentCode}</span>
-            </p>
-          </div>
-        </div>
-
-        {error && (
-          <div className="mb-6 p-5 bg-red-50 border-l-4 border-red-500 rounded-lg">
-            <p className="text-red-700 font-medium">{error}</p>
-          </div>
-        )}
-
-        {/* Add Entry Button */}
-        {!showAddForm && (
-          <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
-            <button
-              onClick={() => setShowAddForm(true)}
-              className="w-full py-4 bg-gradient-to-r from-primary-600 to-teal-600 text-white rounded-xl hover:from-primary-700 hover:to-teal-700 font-bold text-lg shadow-lg flex items-center justify-center gap-2"
-            >
-              <span className="text-2xl">➕</span>
-              <span>เพิ่มรายการอาหารใหม่</span>
-            </button>
-          </div>
-        )}
-
-        {/* Add Entry Form */}
-        {showAddForm && (
-          <div className="bg-white rounded-2xl shadow-xl p-8 mb-6">
-            <h2 className="text-2xl font-bold text-primary-700 mb-6 pb-3 border-b-2 border-primary-200">
-              เพิ่มรายการอาหาร
-            </h2>
-
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-              {/* Date and Time */}
-              <div className="grid md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-gray-800 font-bold mb-2">วันที่ *</label>
-                  <input
-                    type="date"
-                    {...register("entry_date")}
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500"
-                  />
-                  {errors.entry_date && (
-                    <p className="text-red-600 text-sm mt-1">{errors.entry_date.message}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-gray-800 font-bold mb-2">เวลา</label>
-                  <input
-                    type="time"
-                    {...register("entry_time")}
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-              </div>
-
-              {/* Meal Type */}
-              <div>
-                <label className="block text-gray-800 font-bold mb-2">มื้ออาหาร *</label>
-                <select
-                  {...register("meal_type")}
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500"
-                >
-                  <option value="breakfast">🌅 มื้อเช้า</option>
-                  <option value="morning_snack">☕ ของว่างเช้า</option>
-                  <option value="lunch">🍱 มื้อกลางวัน</option>
-                  <option value="afternoon_snack">🍪 ของว่างบ่าย</option>
-                  <option value="dinner">🌙 มื้อเย็น</option>
-                  <option value="before_bed">🌃 ก่อนนอน</option>
-                  <option value="other">🍽️ อื่นๆ</option>
-                </select>
-              </div>
-
-              {/* Menu Name */}
-              <div>
-                <label className="block text-gray-800 font-bold mb-2">ชื่อเมนู *</label>
-                <input
-                  type="text"
-                  {...register("menu_name")}
-                  placeholder="เช่น ข้าวผัดกะเพรา, ส้มตำ, ข้าวเหนียวมะม่วง"
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500"
-                />
-                {errors.menu_name && (
-                  <p className="text-red-600 text-sm mt-1">{errors.menu_name.message}</p>
-                )}
-              </div>
-
-              {/* Description */}
-              <div>
-                <label className="block text-gray-800 font-bold mb-2">รายละเอียด</label>
-                <textarea
-                  {...register("description")}
-                  rows={3}
-                  placeholder="ระบุส่วนประกอบหรือวิธีการปรุง"
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500"
-                />
-              </div>
-
-              {/* Portion */}
-              <div>
-                <label className="block text-gray-800 font-bold mb-2">ปริมาณ</label>
-                <input
-                  type="text"
-                  {...register("portion_description")}
-                  placeholder="เช่น 1 จาน, 2 ชาม, 5 ชิ้น"
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500"
-                />
-              </div>
-
-              {/* Photo Upload */}
-              <div>
-                <label className="block text-gray-800 font-bold mb-2">รูปภาพอาหาร</label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handleFileChange}
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500"
-                />
-                {selectedFiles.length > 0 && (
-                  <p className="text-sm text-gray-600 mt-2">
-                    เลือกแล้ว {selectedFiles.length} ไฟล์
-                  </p>
-                )}
-              </div>
-
-              {/* Buttons */}
-              <div className="flex gap-4 pt-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowAddForm(false);
-                    reset();
-                    setSelectedFiles([]);
-                  }}
-                  className="flex-1 py-3 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 font-semibold"
-                >
-                  ยกเลิก
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="flex-1 py-3 bg-gradient-to-r from-primary-600 to-teal-600 text-white rounded-xl hover:from-primary-700 hover:to-teal-700 disabled:from-gray-400 disabled:to-gray-400 font-semibold shadow-lg"
-                >
-                  {loading ? "กำลังบันทึก..." : "บันทึก"}
-                </button>
-              </div>
-            </form>
-          </div>
-        )}
-
-        {/* Entries List */}
-        <div className="bg-white rounded-2xl shadow-xl p-8 mb-6">
-          <h2 className="text-2xl font-bold text-primary-700 mb-6 pb-3 border-b-2 border-primary-200">
-            รายการบันทึก ({entries.length} รายการ)
-          </h2>
-
-          {entries.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-              <div className="text-6xl mb-4">📝</div>
-              <p className="text-lg">ยังไม่มีรายการบันทึก</p>
-              <p className="text-sm">เริ่มบันทึกอาหารของคุณได้เลย</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {entries.map((entry) => (
-                <div
-                  key={entry.id}
-                  className="border-2 border-gray-200 rounded-xl p-6 hover:border-primary-400 transition-all"
-                >
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <div className="flex items-center gap-3 mb-2">
-                        <span className="text-2xl">{getMealTypeLabel(entry.meal_type)}</span>
-                        <h3 className="text-xl font-bold text-gray-800">{entry.menu_name}</h3>
-                      </div>
-                      <div className="text-sm text-gray-600 flex gap-4">
-                        <span>📅 {new Date(entry.entry_date).toLocaleDateString("th-TH")}</span>
-                        {entry.entry_time && <span>🕐 {entry.entry_time}</span>}
-                        {entry.portion_description && <span>📏 {entry.portion_description}</span>}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => handleDelete(entry.id)}
-                      className="text-red-600 hover:text-red-800 p-2"
-                      title="ลบรายการ"
-                    >
-                      🗑️
-                    </button>
-                  </div>
-
-                  {entry.description && <p className="text-gray-700 mb-4">{entry.description}</p>}
-
-                  {entry.photos && entry.photos.length > 0 && (
-                    <div className="flex gap-2 flex-wrap">
-                      {entry.photos.map((photo) => (
-                        <img
-                          key={photo.id}
-                          src={`${import.meta.env.VITE_API_URL}${photo.file_path}`}
-                          alt={photo.original_filename}
-                          className="w-24 h-24 object-cover rounded-lg border-2 border-gray-200 hover:border-primary-400 cursor-pointer"
-                          onClick={() =>
-                            window.open(
-                              `${import.meta.env.VITE_API_URL}${photo.file_path}`,
-                              "_blank"
-                            )
-                          }
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Navigation */}
-        <div className="bg-white rounded-2xl shadow-xl p-6">
-          <button
-            onClick={() => navigate("/")}
-            className="w-full py-3 border-2 border-primary-600 text-primary-700 rounded-xl hover:bg-primary-50 font-bold text-lg"
-          >
-            ← กลับหน้าหลัก
-          </button>
-        </div>
-      </div>
+  if(loading)return <div className="min-h-screen grid place-items-center bg-[#f7faf9] text-xl">กำลังโหลดบันทึกอาหาร…</div>;
+  return <div className="min-h-screen bg-[#f7faf9] pb-20">
+    <div className="mx-auto max-w-2xl px-4 py-6">
+      <div className="mb-5 flex items-center justify-between"><div><p className="text-sm font-semibold text-teal-700">SANSA</p><h1 className="text-3xl font-bold text-slate-900">บันทึกอาหาร</h1></div><button onClick={()=>navigate("/")} className="rounded-xl border bg-white px-4 py-2 text-slate-600">หน้าหลัก</button></div>
+      {error&&<div role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">{error}</div>}
+      <section className="mb-5 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex items-center justify-between gap-3"><button aria-label="วันก่อนหน้า" onClick={()=>setSelectedDate(shiftDate(selectedDate,-1))} className="h-12 w-12 rounded-full bg-slate-100 text-3xl">‹</button><div className="text-center"><p className="font-bold text-teal-700">{selectedDate===today()?"วันนี้":"วันที่เลือก"}</p><p className="text-lg font-semibold">{new Date(`${selectedDate}T12:00:00`).toLocaleDateString("th-TH",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</p></div><button aria-label="วันถัดไป" disabled={selectedDate>=today()} onClick={()=>setSelectedDate(shiftDate(selectedDate,1))} className="h-12 w-12 rounded-full bg-slate-100 text-3xl disabled:opacity-30">›</button></div>
+        <label className="mx-auto mt-4 block w-fit cursor-pointer rounded-xl border border-teal-200 px-4 py-2 font-semibold text-teal-700">📅 เลือกวันอื่น<input type="date" max={today()} value={selectedDate} onChange={e=>setSelectedDate(e.target.value)} className="sr-only"/></label>
+      </section>
+      <section className="mb-5 rounded-3xl bg-teal-700 p-5 text-white"><p className="text-lg font-bold">บันทึกแล้ว {completed} จาก 3 มื้อหลัก</p><div className="mt-4 grid grid-cols-3 gap-2">{meals.map(meal=><div key={meal.key} className={`rounded-xl p-2 text-center text-sm ${dayEntries.some(i=>i.meal_type===meal.key)?"bg-white text-teal-800":"bg-white/15"}`}>{dayEntries.some(i=>i.meal_type===meal.key)?"✓ ":""}{meal.label}</div>)}</div></section>
+      <div className="space-y-5">{meals.map(meal=>{const current=dayEntries.filter(i=>i.meal_type===meal.key);const yesterday=entries.filter(i=>i.entry_date===shiftDate(selectedDate,-1)&&i.meal_type===meal.key);const snack=snackFor[meal.key];return <section key={meal.key} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="mb-4 flex items-center gap-3"><span className="text-3xl">{meal.icon}</span><div><h2 className="text-xl font-bold">{meal.label}</h2><p className="text-sm text-slate-500">{current.length?`${current.length} รายการ`:"ยังไม่ได้บันทึก"}</p></div></div>
+        <div className="space-y-3">{current.map(item=><div key={item.id} className="flex items-center gap-3 rounded-2xl bg-slate-50 p-4"><span className="text-2xl">🍽️</span><button onClick={()=>openForm(meal.key,item)} className="min-w-0 flex-1 text-left"><strong className="block truncate text-lg">{item.menu_name}</strong><span className="text-sm text-slate-500">{item.portion_description||"ไม่ระบุปริมาณ"}{item.entry_time?` · ${item.entry_time.slice(0,5)} น.`:""} · แก้ไข ›</span></button><button aria-label="ลบรายการ" onClick={()=>remove(item.id)} className="rounded-lg p-2 text-red-600">ลบ</button></div>)}</div>
+        <button onClick={()=>openForm(meal.key)} className="mt-4 w-full rounded-2xl bg-teal-600 py-3 font-bold text-white">＋ เพิ่มอาหาร</button>
+        {yesterday.length>0&&<button disabled={busy} onClick={()=>copyYesterday(meal.key)} className="mt-3 w-full rounded-2xl border border-teal-200 bg-teal-50 p-3 text-left font-semibold text-teal-800">↻ กินเหมือนเมื่อวาน <span className="block truncate text-sm font-normal text-teal-700">{yesterday.map(i=>i.menu_name).join(", ")}</span></button>}
+        {snack&&<button onClick={()=>openForm(snack.key)} className="mt-3 w-full rounded-2xl border border-dashed border-slate-300 py-3 font-semibold text-slate-600">＋ {snack.label}</button>}
+        {snack&&dayEntries.filter(i=>i.meal_type===snack.key).map(item=><button key={item.id} onClick={()=>openForm(item.meal_type,item)} className="mt-3 w-full rounded-2xl bg-amber-50 p-3 text-left"><strong>{item.menu_name}</strong><span className="ml-2 text-sm text-slate-500">ของว่าง · แก้ไข ›</span></button>)}
+      </section>})}</div>
     </div>
-  );
+    {open&&<div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 sm:items-center sm:p-4"><div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-white p-6 shadow-2xl sm:rounded-3xl"><div className="mb-5 flex justify-between"><h2 className="text-2xl font-bold">{editing?"แก้ไขรายการอาหาร":"เพิ่มรายการอาหาร"}</h2><button onClick={()=>setOpen(false)} className="text-2xl" aria-label="ปิด">×</button></div><form onSubmit={handleSubmit(submit)} className="space-y-4">
+      <div><label className="mb-1 block font-bold">ชื่ออาหาร *</label><input {...register("menu_name")} placeholder="เช่น ข้าวต้ม โจ๊ก นมจืด" className="w-full rounded-xl border-2 border-slate-200 p-3 text-lg"/>{errors.menu_name&&<p className="text-red-600">{errors.menu_name.message}</p>}</div>
+      <div className="grid grid-cols-2 gap-3"><div><label className="mb-1 block font-bold">ปริมาณ</label><input {...register("portion_description")} placeholder="เช่น 1 ชาม" className="w-full rounded-xl border-2 border-slate-200 p-3"/></div><div><label className="mb-1 block font-bold">เวลา</label><input type="time" {...register("entry_time")} className="w-full rounded-xl border-2 border-slate-200 p-3"/></div></div>
+      <div><label className="mb-1 block font-bold">รายละเอียดเพิ่มเติม</label><textarea {...register("description")} placeholder="ส่วนประกอบหรือวิธีปรุง (ถ้ามี)" className="w-full rounded-xl border-2 border-slate-200 p-3" rows={3}/></div>
+      <input type="hidden" {...register("meal_type")} value={formMeal}/>
+      <div className="grid grid-cols-2 gap-3 pt-2"><button type="button" onClick={()=>setOpen(false)} className="rounded-xl border-2 py-3 font-bold">ยกเลิก</button><button disabled={busy} type="submit" className="rounded-xl bg-teal-600 py-3 font-bold text-white disabled:opacity-50">{busy?"กำลังบันทึก…":"บันทึก"}</button></div>
+    </form></div></div>}
+  </div>;
 }

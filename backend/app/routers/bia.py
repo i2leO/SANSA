@@ -9,18 +9,25 @@ from app.schemas import (
     BIARecordUpdate,
     BIARecordResponse,
     MessageResponse,
+    ParticipantWaistUpdate,
+    BIAStaffSubmission,
 )
 from app.services.scoring_service import ScoringService
 from app.auth import get_current_staff_or_admin
+from app.services.assessment_revision_service import append_assessment_revision, ensure_assessment_baseline
 
 router = APIRouter(prefix="/bia", tags=["bia"])
 
 
 @router.post("", response_model=BIARecordResponse)
-def create_bia_record(bia_create: BIARecordCreate, db: Session = Depends(get_db)):
+def create_bia_record(
+    bia_create: BIARecordCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_staff_or_admin),
+):
     """
     Create BIA (Body Impedance Analysis) record
-    Can be submitted by respondent (no auth) or staff (with auth)
+    Staff/admin-only full body-composition record.
     """
     # Verify visit exists
     visit = db.query(Visit).filter(Visit.id == bia_create.visit_id).first()
@@ -59,10 +66,15 @@ def create_bia_record(bia_create: BIARecordCreate, db: Session = Depends(get_db)
         fat_mass_kg=bia_create.fat_mass_kg,
         body_fat_percentage=bia_create.body_fat_percentage,
         visceral_fat_kg=bia_create.visceral_fat_kg,
+        visceral_fat_level=bia_create.visceral_fat_level,
         muscle_mass_kg=bia_create.muscle_mass_kg,
         bone_mass_kg=bia_create.bone_mass_kg,
         water_percentage=bia_create.water_percentage,
         metabolic_rate=bia_create.metabolic_rate,
+        mac_cm=bia_create.mac_cm,
+        cc_cm=bia_create.cc_cm,
+        hip_circumference_cm=bia_create.hip_circumference_cm,
+        notes=bia_create.notes,
         bmi_category=bmi_category,
         weight_management=bia_create.weight_management,
         food_recommendation=bia_create.food_recommendation,
@@ -72,6 +84,8 @@ def create_bia_record(bia_create: BIARecordCreate, db: Session = Depends(get_db)
     )
 
     db.add(bia_record)
+    db.flush()
+    append_assessment_revision(db, "BIA", bia_record, current_user, "create")
     db.commit()
     db.refresh(bia_record)
 
@@ -79,7 +93,11 @@ def create_bia_record(bia_create: BIARecordCreate, db: Session = Depends(get_db)
 
 
 @router.get("/{bia_record_id}", response_model=BIARecordResponse)
-def get_bia_record(bia_record_id: int, db: Session = Depends(get_db)):
+def get_bia_record(
+    bia_record_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_staff_or_admin),
+):
     """Get BIA record by ID"""
     bia_record = db.query(BIARecord).filter(BIARecord.id == bia_record_id).first()
 
@@ -90,7 +108,11 @@ def get_bia_record(bia_record_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/visit/{visit_id}", response_model=BIARecordResponse)
-def get_bia_by_visit(visit_id: int, db: Session = Depends(get_db)):
+def get_bia_by_visit(
+    visit_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_staff_or_admin),
+):
     """Get BIA record by visit ID"""
     bia_record = db.query(BIARecord).filter(BIARecord.visit_id == visit_id).first()
 
@@ -100,6 +122,86 @@ def get_bia_by_visit(visit_id: int, db: Session = Depends(get_db)):
         )
 
     return bia_record
+
+
+@router.put("/visit/{visit_id}/waist")
+def save_participant_waist(
+    visit_id: int,
+    payload: ParticipantWaistUpdate,
+    db: Session = Depends(get_db),
+):
+    """Store only the Model 3 waist input for the owner of this visit."""
+    visit = db.query(Visit).filter(Visit.id == visit_id).first()
+    if not visit:
+        raise HTTPException(status_code=404, detail="Visit not found")
+
+    records = db.query(BIARecord).filter(BIARecord.visit_id == visit_id).limit(2).all()
+    if len(records) > 1:
+        raise HTTPException(
+            status_code=409,
+            detail="พบข้อมูล BIA หลายรายการ กรุณาให้เจ้าหน้าที่ตรวจสอบ",
+        )
+
+    if records:
+        record = records[0]
+        ensure_assessment_baseline(db, "BIA", record)
+        record.waist_circumference_cm = payload.waist_circumference_cm
+    else:
+        record = BIARecord(
+            visit_id=visit_id,
+            waist_circumference_cm=payload.waist_circumference_cm,
+            measurement_date=datetime.utcnow().date(),
+            created_at=datetime.utcnow(),
+        )
+        db.add(record)
+
+    db.flush()
+    append_assessment_revision(db, "BIA", record, action_type="participant_update" if records else "participant_create")
+
+    db.commit()
+    return {"saved": True}
+
+
+@router.put("/visit/{visit_id}/staff", response_model=BIARecordResponse)
+def save_complete_staff_bia(
+    visit_id: int,
+    payload: BIAStaffSubmission,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_staff_or_admin),
+):
+    """Create/update one complete revised4 staff BIA row for a visit."""
+    visit = db.query(Visit).filter(Visit.id == visit_id).first()
+    if not visit:
+        raise HTTPException(status_code=404, detail="Visit not found")
+    records = db.query(BIARecord).filter(BIARecord.visit_id == visit_id).limit(2).all()
+    if len(records) > 1:
+        raise HTTPException(status_code=409, detail="พบข้อมูล BIA หลายรายการ กรุณาตรวจสอบก่อนบันทึก")
+
+    values = payload.model_dump()
+    height_m = values["height_cm"] / 100
+    bmi = values["weight_kg"] / (height_m * height_m)
+    values["bmi"] = bmi
+    values["bmi_category"] = ScoringService(db).get_bmi_category(bmi)
+
+    if records:
+        record = records[0]
+        ensure_assessment_baseline(db, "BIA", record)
+        for field, value in values.items():
+            setattr(record, field, value)
+    else:
+        record = BIARecord(
+            visit_id=visit_id,
+            measurement_date=datetime.utcnow().date(),
+            created_at=datetime.utcnow(),
+            **values,
+        )
+        db.add(record)
+    record.measured_by = current_user.id
+    db.flush()
+    append_assessment_revision(db, "BIA", record, current_user, "update" if records else "create")
+    db.commit()
+    db.refresh(record)
+    return record
 
 
 @router.put("/{bia_record_id}", response_model=BIARecordResponse)
@@ -115,8 +217,10 @@ def update_bia_record(
     if not bia_record:
         raise HTTPException(status_code=404, detail="BIA record not found")
 
+    ensure_assessment_baseline(db, "BIA", bia_record)
+
     # Update fields that are provided
-    update_data = bia_update.dict(exclude_unset=True)
+    update_data = bia_update.model_dump(exclude_unset=True)
 
     # Recalculate BMI if weight or height changed
     if "weight_kg" in update_data or "height_cm" in update_data:
@@ -131,9 +235,16 @@ def update_bia_record(
             # Update BMI category
             scoring_service = ScoringService(db)
             update_data["bmi_category"] = scoring_service.get_bmi_category(bmi)
+        else:
+            update_data["bmi"] = None
+            update_data["bmi_category"] = None
 
     for field, value in update_data.items():
         setattr(bia_record, field, value)
+
+    bia_record.measured_by = getattr(current_user, "id", None)
+    db.flush()
+    append_assessment_revision(db, "BIA", bia_record, current_user, "update")
 
     db.commit()
     db.refresh(bia_record)
@@ -153,14 +264,15 @@ def delete_bia_record(
     if not bia_record:
         raise HTTPException(status_code=404, detail="BIA record not found")
 
-    db.delete(bia_record)
-    db.commit()
-
-    return {"message": "BIA record deleted successfully"}
+    raise HTTPException(status_code=409, detail="ข้อมูลวิจัย BIA ห้ามลบ กรุณาบันทึกการแก้ไขเป็น revision ใหม่")
 
 
 @router.get("/visit/{visit_id}/interpretation")
-def get_bia_interpretation(visit_id: int, db: Session = Depends(get_db)):
+def get_bia_interpretation(
+    visit_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_staff_or_admin),
+):
     """Get BIA interpretation and recommendations"""
     bia_record = db.query(BIARecord).filter(BIARecord.visit_id == visit_id).first()
 

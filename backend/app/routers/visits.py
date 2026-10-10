@@ -1,13 +1,21 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional
+from pydantic import BaseModel
+from sqlalchemy import func
 from app.database import get_db
-from app.models import Visit, Respondent, User
+from app.models import Visit, Respondent, User, VisitType
 from app.schemas import VisitCreate, VisitResponse
 from app.auth import get_current_staff_or_admin, get_current_user_optional
 
 router = APIRouter(prefix="/visits", tags=["visits"])
+
+
+class NextAssessmentOccurrence(BaseModel):
+    assessment_date: Optional[date] = None
+    visit_type: VisitType = VisitType.FOLLOW_UP
+    notes: Optional[str] = None
 
 
 @router.post("", response_model=VisitResponse)
@@ -92,3 +100,28 @@ def list_visits(
     )
 
     return visits
+
+
+@router.post("/respondent/{respondent_id}/next", response_model=VisitResponse)
+def create_next_assessment_occurrence(
+    respondent_id: int,
+    payload: NextAssessmentOccurrence,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_staff_or_admin),
+):
+    respondent = db.query(Respondent).filter_by(id=respondent_id, is_deleted=False).first()
+    if respondent is None:
+        raise HTTPException(status_code=404, detail="Respondent not found")
+    next_number = (db.query(func.max(Visit.visit_number)).filter_by(respondent_id=respondent_id).scalar() or 0) + 1
+    occurrence = Visit(
+        respondent_id=respondent_id,
+        visit_number=next_number,
+        visit_date=payload.assessment_date or date.today(),
+        visit_type=payload.visit_type,
+        notes=payload.notes,
+        created_by=getattr(current_user, "id", None),
+    )
+    db.add(occurrence)
+    db.commit()
+    db.refresh(occurrence)
+    return occurrence

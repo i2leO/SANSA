@@ -1,12 +1,14 @@
-from pydantic import AliasChoices, BaseModel, ConfigDict, EmailStr, Field, validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, EmailStr, Field, model_validator, validator
 from typing import Optional, List
 from datetime import datetime, date, time
 from decimal import Decimal
 from enum import Enum
+from app.services.sansa_definition import QUESTIONS_BY_FIELD, canonical_values
 
 
 # Enums
 class UserRole(str, Enum):
+    USER = "user"
     ADMIN = "admin"
     STAFF = "staff"
 
@@ -21,6 +23,60 @@ class Sex(str, Enum):
 class RespondentStatus(str, Enum):
     ELDERLY = "elderly"
     CAREGIVER = "caregiver"
+
+
+# Closed vocabularies from revised4 Data_Dictionary. Historical values remain
+# readable in RespondentResponse, but new completed profiles cannot introduce
+# options that are absent from the approved workbook.
+class ResearchSex(str, Enum):
+    MALE = "male"
+    FEMALE = "female"
+
+
+class EducationLevel(str, Enum):
+    NO_EDUCATION = "no_education"
+    PRIMARY = "primary"
+    SECONDARY = "secondary"
+    VOCATIONAL = "vocational"
+    BACHELOR = "bachelor"
+    GRADUATE = "graduate"
+
+
+class MaritalStatus(str, Enum):
+    SINGLE = "single"
+    MARRIED = "married"
+    WIDOWED = "widowed"
+    DIVORCED = "divorced"
+
+
+class MonthlyIncome(str, Enum):
+    UNDER_10K = "under_10k"
+    FROM_10K_TO_20K = "10k_20k"
+    FROM_20K_TO_30K = "20k_30k"
+    OVER_30K = "over_30k"
+
+
+class IncomeSource(str, Enum):
+    OLD_AGE = "old_age"
+    PENSION = "pension"
+    SPOUSE = "spouse"
+    CHILDREN = "children"
+    WORK = "work"
+
+
+class ChronicDisease(str, Enum):
+    DM = "dm"
+    HT = "ht"
+    DLP = "dlp"
+    CKD = "ckd"
+    CA = "ca"
+
+
+class LivingArrangement(str, Enum):
+    ALONE = "alone"
+    WITH_SPOUSE = "with_spouse"
+    WITH_FRIENDS = "with_friends"
+    WITH_FAMILY = "with_family"
 
 
 class VisitType(str, Enum):
@@ -56,10 +112,16 @@ class Token(BaseModel):
     token_type: str = "bearer"
 
 
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
+
+
 class TokenData(BaseModel):
     user_id: Optional[int] = None
     username: Optional[str] = None
     role: Optional[str] = None
+    qr_version: Optional[str] = None
+    token_type: Optional[str] = None
 
 
 class UserLogin(BaseModel):
@@ -125,9 +187,37 @@ class RespondentUpdate(BaseModel):
     email: Optional[EmailStr] = None
 
 
+class ChronicDiseasesInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    diseases: List[ChronicDisease]
+    other: str = ""
+
+
+class RespondentProfileUpdate(BaseModel):
+    """Complete participant profile required before the SANSA workflow."""
+
+    model_config = ConfigDict(extra="forbid")
+    status: RespondentStatus
+    age: int = Field(..., ge=60, le=150)
+    sex: ResearchSex
+    education_level: EducationLevel
+    marital_status: MaritalStatus
+    monthly_income: MonthlyIncome
+    income_sources: List[IncomeSource]
+    chronic_diseases: ChronicDiseasesInput
+    living_arrangement: LivingArrangement
+
+    @model_validator(mode="after")
+    def validate_other_disease(self):
+        self.chronic_diseases.other = self.chronic_diseases.other.strip()
+        return self
+
+
 class RespondentResponse(BaseModel):
     id: int
     respondent_code: str
+    source_dataset: Optional[str] = None
+    source_record_id: Optional[int] = None
     status: Optional[str]
     age: Optional[int]
     sex: Optional[str]
@@ -168,7 +258,7 @@ class VisitResponse(BaseModel):
     id: int
     respondent_id: int
     visit_number: int
-    visit_date: date
+    visit_date: Optional[date]
     visit_time: Optional[time]
     facility_id: Optional[int]
     visit_type: str
@@ -183,23 +273,33 @@ class VisitResponse(BaseModel):
 class SANSAResponseCreate(BaseModel):
     visit_id: int
     # Screening questions (Q1-Q4)
-    q1_weight_change: Optional[str] = None
-    q2_food_intake: Optional[str] = None
-    q3_daily_activities: Optional[str] = None
-    q4_chronic_disease: Optional[str] = None
+    q1_weight_change: str = Field(..., min_length=1)
+    q2_food_intake: str = Field(..., min_length=1)
+    q3_daily_activities: str = Field(..., min_length=1)
+    q4_chronic_disease: str = Field(..., min_length=1)
     # Dietary questions (Q5-Q16)
-    q5_meals_per_day: Optional[str] = None
-    q6_portion_size: Optional[str] = None
-    q7_food_texture: Optional[str] = None
-    q8_rice_starch: Optional[str] = None
-    q9_protein: Optional[str] = None
-    q10_milk: Optional[str] = None
-    q11_fruits: Optional[str] = None
-    q12_vegetables: Optional[str] = None
-    q13_water: Optional[str] = None
-    q14_sweet_drinks: Optional[str] = None
-    q15_cooking_method: Optional[str] = None
-    q16_oil_coconut: Optional[str] = None
+    q5_meals_per_day: str = Field(..., min_length=1)
+    q6_portion_size: str = Field(..., min_length=1)
+    q7_food_texture: str = Field(..., min_length=1)
+    q8_rice_starch: str = Field(..., min_length=1)
+    q9_protein: str = Field(..., min_length=1)
+    q10_milk: str = Field(..., min_length=1)
+    q11_fruits: str = Field(..., min_length=1)
+    q12_vegetables: str = Field(..., min_length=1)
+    q13_water: str = Field(..., min_length=1)
+    q14_sweet_drinks: str = Field(..., min_length=1)
+    q15_cooking_method: str = Field(..., min_length=1)
+    q16_oil_coconut: str = Field(..., min_length=1)
+
+    @model_validator(mode="after")
+    def validate_codebook_answers(self):
+        for field_name, question in QUESTIONS_BY_FIELD.items():
+            answer = getattr(self, field_name)
+            if answer not in canonical_values(field_name):
+                raise ValueError(
+                    f"คำตอบ SANSA ข้อ {question['number']} ไม่อยู่ในนิยามแบบประเมินที่อนุมัติ"
+                )
+        return self
 
 
 class SANSAResponseUpdate(BaseModel):
@@ -221,7 +321,66 @@ class SANSAResponseUpdate(BaseModel):
     q16_oil_coconut: Optional[str] = None
 
 
+class SANSADomainScores(BaseModel):
+    d1_total: Optional[Decimal] = None
+    d2_total: Optional[Decimal] = None
+    d3_total: Optional[Decimal] = None
+
+
+class SANSAPredictionOutput(BaseModel):
+    d2_total: Decimal
+    d3_total: Decimal
+    waist_cm: Decimal
+    age_group01: int
+    l_over: Decimal
+    l_normal: Decimal
+    p_under: Decimal
+    p_normal: Decimal
+    p_over: Decimal
+    predicted_group: str
+    model_version: str
+
+
+class BIAReferenceOutput(BaseModel):
+    bmi_rounded: Decimal
+    bmi_class: str
+    pbf_class: str
+    nutrition_reference: str
+
+
+class SANSAComparison(BaseModel):
+    predicted_group: str
+    nutrition_reference: str
+    matches: bool
+
+
+class SANSARevisedResult(BaseModel):
+    domain_scores: Optional[SANSADomainScores] = None
+    prediction: Optional[SANSAPredictionOutput] = None
+    reference: Optional[BIAReferenceOutput] = None
+    comparison: Optional[SANSAComparison] = None
+    bia_record_id: Optional[int] = None
+    issues: List[str] = Field(default_factory=list)
+    saved: bool = False
+    verified_024: bool = False
+    missing_answer_fields: List[str] = Field(default_factory=list)
+    invalid_answer_fields: List[str] = Field(default_factory=list)
+    score_mismatch_fields: List[str] = Field(default_factory=list)
+
+
+class SANSAParticipantResult(BaseModel):
+    """Minimum prediction contract exposed to participant sessions."""
+
+    predicted_group: Optional[str] = None
+    ready: bool
+
+
+class ParticipantWaistUpdate(BaseModel):
+    waist_circumference_cm: Decimal = Field(..., gt=0, le=300)
+
+
 class SANSAResponseFull(BaseModel):
+    revised: Optional[SANSARevisedResult] = None
     id: int
     visit_id: int
     scoring_version_id: int
@@ -263,6 +422,8 @@ class SANSAResponseFull(BaseModel):
     diet_total: Optional[Decimal]
     total_score: Optional[Decimal]
     result_level: Optional[str]
+    source_dataset: Optional[str] = None
+    answer_capture_mode: Optional[str] = None
     completed_at: Optional[datetime]
 
     class Config:
@@ -272,13 +433,13 @@ class SANSAResponseFull(BaseModel):
 # Satisfaction Schemas
 class SatisfactionResponseCreate(BaseModel):
     visit_id: int
-    q1_clarity: Optional[int] = Field(None, ge=1, le=5)  # ความชัดเจนของคำถาม
-    q2_ease_of_use: Optional[int] = Field(None, ge=1, le=5)  # ความสะดวกในการใช้งาน
-    q3_confidence: Optional[int] = Field(None, ge=1, le=5)  # ความมั่นใจในการกรอก
-    q4_presentation: Optional[int] = Field(None, ge=1, le=5)  # รูปแบบการนำเสนอ
-    q5_results_display: Optional[int] = Field(None, ge=1, le=5)  # การแสดงผลลัพธ์
-    q6_usefulness: Optional[int] = Field(None, ge=1, le=5)  # ประโยชน์ที่ได้รับ
-    q7_overall_satisfaction: Optional[int] = Field(None, ge=1, le=5)  # ความพึงพอใจโดยรวม
+    q1_clarity: int = Field(..., ge=1, le=5)  # ความชัดเจนของคำถาม
+    q2_ease_of_use: int = Field(..., ge=1, le=5)  # ความสะดวกในการใช้งาน
+    q3_confidence: int = Field(..., ge=1, le=5)  # ความมั่นใจในการกรอก
+    q4_presentation: int = Field(..., ge=1, le=5)  # รูปแบบการนำเสนอ
+    q5_results_display: int = Field(..., ge=1, le=5)  # การแสดงผลลัพธ์
+    q6_usefulness: int = Field(..., ge=1, le=5)  # ประโยชน์ที่ได้รับ
+    q7_overall_satisfaction: int = Field(..., ge=1, le=5)  # ความพึงพอใจโดยรวม
     comments: Optional[str] = None
 
 
@@ -313,6 +474,7 @@ class SatisfactionResponseFull(BaseModel):
 # MNA Schemas
 class MNAResponseCreate(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
+    q19_calf_circumference_assess: Optional[str] = None
     visit_id: int
     # Screening (Q1-Q7)
     q1_food_intake_decline: Optional[str] = None
@@ -389,6 +551,7 @@ class MNAResponseCreate(BaseModel):
 
 class MNAResponseUpdate(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
+    q19_calf_circumference_assess: Optional[str] = None
     q1_food_intake_decline: Optional[str] = None
     q2_weight_loss: Optional[str] = None
     q3_mobility: Optional[str] = None
@@ -461,6 +624,11 @@ class MNAResponseUpdate(BaseModel):
 
 
 class MNAResponseFull(BaseModel):
+    history_requires_review: bool = False
+    q19_calf_circumference_assess: Optional[str] = None
+    mna_a12: Optional[Decimal] = None
+    mac_cm: Optional[Decimal] = None
+    cc_cm: Optional[Decimal] = None
     id: int
     visit_id: int
     scoring_version_id: int
@@ -524,10 +692,13 @@ class BIARecordCreate(BaseModel):
     fat_mass_kg: Optional[Decimal] = None
     body_fat_percentage: Optional[Decimal] = None
     visceral_fat_kg: Optional[Decimal] = None
+    visceral_fat_level: Optional[Decimal] = None
     muscle_mass_kg: Optional[Decimal] = None
     bone_mass_kg: Optional[Decimal] = None
     water_percentage: Optional[Decimal] = None
     metabolic_rate: Optional[int] = None
+    mac_cm: Optional[Decimal] = None
+    cc_cm: Optional[Decimal] = None
     hip_circumference_cm: Optional[Decimal] = None
     weight_management: Optional[str] = None  # คงไว้/ลด/เพิ่ม
     food_recommendation: Optional[str] = None
@@ -545,16 +716,37 @@ class BIARecordUpdate(BaseModel):
     fat_mass_kg: Optional[Decimal] = None
     body_fat_percentage: Optional[Decimal] = None
     visceral_fat_kg: Optional[Decimal] = None
+    visceral_fat_level: Optional[Decimal] = None
     muscle_mass_kg: Optional[Decimal] = None
     bone_mass_kg: Optional[Decimal] = None
     water_percentage: Optional[Decimal] = None
     metabolic_rate: Optional[int] = None
+    mac_cm: Optional[Decimal] = None
+    cc_cm: Optional[Decimal] = None
     hip_circumference_cm: Optional[Decimal] = None
     weight_management: Optional[str] = None
     food_recommendation: Optional[str] = None
     staff_signature: Optional[str] = None
     measurement_date: Optional[date] = None
     notes: Optional[str] = None
+
+
+class BIAStaffSubmission(BaseModel):
+    """Complete staff measurement row from revised4 BIA_MNA_Staff."""
+
+    model_config = ConfigDict(extra="forbid")
+    waist_circumference_cm: Decimal = Field(..., gt=0, le=300)
+    weight_kg: Decimal = Field(..., gt=0)
+    height_cm: Decimal = Field(..., gt=0)
+    fat_mass_kg: Decimal = Field(..., ge=0)
+    body_fat_percentage: Decimal = Field(..., ge=0, le=100)
+    visceral_fat_level: Decimal = Field(..., ge=0)
+    muscle_mass_kg: Decimal = Field(..., ge=0)
+    bone_mass_kg: Decimal = Field(..., ge=0)
+    water_percentage: Decimal = Field(..., ge=0, le=100)
+    metabolic_rate: int = Field(..., gt=0)
+    mac_cm: Decimal = Field(..., gt=0)
+    cc_cm: Decimal = Field(..., gt=0)
 
 
 class BIARecordResponse(BaseModel):
@@ -570,10 +762,13 @@ class BIARecordResponse(BaseModel):
     fat_mass_kg: Optional[Decimal]
     body_fat_percentage: Optional[Decimal]
     visceral_fat_kg: Optional[Decimal]
+    visceral_fat_level: Optional[Decimal]
     muscle_mass_kg: Optional[Decimal]
     bone_mass_kg: Optional[Decimal]
     water_percentage: Optional[Decimal]
     metabolic_rate: Optional[int]
+    mac_cm: Optional[Decimal]
+    cc_cm: Optional[Decimal]
     hip_circumference_cm: Optional[Decimal]
     waist_hip_ratio: Optional[Decimal]
     weight_management: Optional[str]
@@ -688,6 +883,9 @@ class KnowledgePostCreate(BaseModel):
     summary: Optional[str] = None
     category: Optional[str] = None
     tags: Optional[str] = None
+    featured_image_path: Optional[str] = None
+    media_path: Optional[str] = None
+    media_type: Optional[str] = None
     is_published: bool = False
     display_order: int = 0
 
@@ -699,6 +897,9 @@ class KnowledgePostUpdate(BaseModel):
     summary: Optional[str] = None
     category: Optional[str] = None
     tags: Optional[str] = None
+    featured_image_path: Optional[str] = None
+    media_path: Optional[str] = None
+    media_type: Optional[str] = None
     is_published: Optional[bool] = None
     display_order: Optional[int] = None
 
@@ -710,6 +911,8 @@ class KnowledgePostResponse(BaseModel):
     content: Optional[str]
     summary: Optional[str]
     featured_image_path: Optional[str]
+    media_path: Optional[str]
+    media_type: Optional[str]
     category: Optional[str]
     tags: Optional[str]
     is_published: bool
@@ -816,7 +1019,10 @@ class ScoringRuleVersionResponse(BaseModel):
     description: Optional[str]
     is_active: bool
     effective_date: Optional[date]
-    rule_values: List[ScoringRuleValueResponse]
+    rule_values: List[ScoringRuleValueResponse] = Field(
+        validation_alias="scoring_rule_values",
+        serialization_alias="rule_values",
+    )
     created_at: datetime
 
     class Config:

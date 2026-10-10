@@ -12,6 +12,7 @@ from sqlalchemy import (
     Time,
     JSON,
     UniqueConstraint,
+    CheckConstraint,
     Index,
 )
 from sqlalchemy.orm import relationship
@@ -21,6 +22,7 @@ import enum
 
 
 class UserRole(str, enum.Enum):
+    USER = "user"
     ADMIN = "admin"
     STAFF = "staff"
 
@@ -70,6 +72,7 @@ class User(Base):
     username = Column(String(50), unique=True, nullable=False, index=True)
     email = Column(String(100), unique=True, nullable=False, index=True)
     hashed_password = Column(String(255), nullable=False)
+    qr_secret_hash = Column(String(64), unique=True, nullable=True)
     full_name = Column(String(100))
     role = Column(Enum(UserRole), nullable=False, default=UserRole.STAFF)
     is_active = Column(Boolean, default=True)
@@ -90,11 +93,55 @@ class User(Base):
     )
 
 
+class SourceImportBatch(Base):
+    """Immutable provenance for one imported research workbook."""
+
+    __tablename__ = "source_import_batches"
+
+    id = Column(Integer, primary_key=True, index=True)
+    source_dataset = Column(String(100), nullable=False, index=True)
+    source_filename = Column(String(255), nullable=False)
+    source_sha256 = Column(String(64), nullable=False, unique=True, index=True)
+    schema_version = Column(String(100), nullable=False)
+    populated_rows = Column(Integer, nullable=False)
+    sheet_manifest = Column(JSON, nullable=False)
+    imported_at = Column(TIMESTAMP, server_default=func.now(), nullable=False)
+
+
+class SourceImportSheet(Base):
+    """Read-only snapshot of one workbook sheet at import time."""
+
+    __tablename__ = "source_import_sheets"
+
+    id = Column(Integer, primary_key=True, index=True)
+    import_batch_id = Column(
+        Integer, ForeignKey("source_import_batches.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    sheet_name = Column(String(100), nullable=False)
+    sheet_role = Column(String(30), nullable=False)
+    row_count = Column(Integer, nullable=False)
+    column_count = Column(Integer, nullable=False)
+    content_sha256 = Column(String(64), nullable=False)
+    values_json = Column(JSON, nullable=False)
+    formulas_json = Column(JSON, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("import_batch_id", "sheet_name", name="uq_source_import_sheet"),
+    )
+
+
 class Respondent(Base):
     __tablename__ = "respondents"
 
     id = Column(Integer, primary_key=True, index=True)
     respondent_code = Column(String(50), unique=True, nullable=False, index=True)
+    source_dataset = Column(String(100), nullable=True, index=True)
+    source_record_id = Column(Integer, nullable=True)
+    source_import_batch_id = Column(
+        Integer, ForeignKey("source_import_batches.id"), nullable=True, index=True
+    )
+
+    qr_secret_hash = Column(String(64), unique=True, nullable=True)
 
     # Demographics - New unified fields
     status = Column(Enum(RespondentStatus))  # ผู้สูงอายุ/ผู้ดูแลผู้สูงอายุ
@@ -127,6 +174,12 @@ class Respondent(Base):
     )
     visits = relationship(
         "Visit", back_populates="respondent", cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "source_dataset", "source_record_id", name="uq_respondent_source_record"
+        ),
     )
 
 
@@ -173,11 +226,12 @@ class Visit(Base):
         Integer, ForeignKey("respondents.id"), nullable=False, index=True
     )
     visit_number = Column(Integer, nullable=False, default=1)
-    visit_date = Column(Date, nullable=False, index=True)
+    visit_date = Column(Date, nullable=True, index=True)
     visit_time = Column(Time)
     facility_id = Column(Integer, ForeignKey("facilities.id"))
     visit_type = Column(Enum(VisitType), default=VisitType.BASELINE)
     notes = Column(Text)
+    source_assessment_id = Column(String(100), nullable=True, index=True)
 
     # Metadata
     created_by = Column(Integer, ForeignKey("users.id"))
@@ -209,6 +263,9 @@ class Visit(Base):
     )
     bia_records = relationship(
         "BIARecord", back_populates="visit", cascade="all, delete-orphan"
+    )
+    prediction_results = relationship(
+        "SANSAPredictionResult", back_populates="visit", cascade="all, delete-orphan"
     )
     food_diary_entries = relationship(
         "FoodDiaryEntry", back_populates="visit", cascade="all, delete-orphan"
@@ -349,6 +406,8 @@ class SANSAResponse(Base):
     diet_total = Column(DECIMAL(10, 2))
     total_score = Column(DECIMAL(10, 2))
     result_level = Column(String(50), index=True)
+    source_dataset = Column(String(100))
+    answer_capture_mode = Column(String(30), default="raw_answers")
 
     # Metadata
     completed_at = Column(TIMESTAMP)
@@ -359,6 +418,39 @@ class SANSAResponse(Base):
     visit = relationship("Visit", back_populates="sansa_response")
     scoring_version = relationship(
         "ScoringRuleVersion", back_populates="sansa_responses"
+    )
+
+
+class SANSAPredictionResult(Base):
+    __tablename__ = "sansa_prediction_results"
+
+    id = Column(Integer, primary_key=True)
+    visit_id = Column(Integer, ForeignKey("visits.id", ondelete="CASCADE"), nullable=False)
+    model_version = Column(String(50), nullable=False)
+    age_group01 = Column(Integer, nullable=False)
+    d2_total = Column(DECIMAL(12, 4), nullable=False)
+    d3_total = Column(DECIMAL(12, 4), nullable=False)
+    waist_cm = Column(DECIMAL(12, 4), nullable=False)
+    l_over = Column(DECIMAL(24, 12), nullable=False)
+    l_normal = Column(DECIMAL(24, 12), nullable=False)
+    p_under = Column(DECIMAL(18, 16), nullable=False)
+    p_normal = Column(DECIMAL(18, 16), nullable=False)
+    p_over = Column(DECIMAL(18, 16), nullable=False)
+    predicted_group = Column(
+        Enum("UNDER", "NORMAL", "OVER", name="sansa_prediction_group",
+             create_constraint=True, validate_strings=True), nullable=False
+    )
+    created_at = Column(TIMESTAMP, nullable=False, server_default=func.now())
+    updated_at = Column(TIMESTAMP, nullable=False, server_default=func.now(), onupdate=func.now())
+    visit = relationship("Visit", back_populates="prediction_results")
+
+    __table_args__ = (
+        UniqueConstraint("visit_id", "model_version", name="uq_sansa_prediction_visit_version"),
+        CheckConstraint("age_group01 IN (0, 1)", name="ck_sansa_prediction_age_group"),
+        CheckConstraint(
+            "p_under BETWEEN 0 AND 1 AND p_normal BETWEEN 0 AND 1 AND p_over BETWEEN 0 AND 1",
+            name="ck_sansa_prediction_probabilities",
+        ),
     )
 
 
@@ -446,6 +538,11 @@ class MNAResponse(Base):
     mna_a10 = Column(DECIMAL(10, 2))
     q18_mid_arm_circumference = Column(String(50))
     mna_a11 = Column(DECIMAL(10, 2))
+    # Full-assessment R is distinct from the historical screening calf slot.
+    q19_calf_circumference_assess = Column(String(50))
+    mna_a12 = Column(DECIMAL(10, 2))
+    mac_cm = Column(DECIMAL(5, 2))
+    cc_cm = Column(DECIMAL(5, 2))
     mna_ass_total = Column(DECIMAL(10, 2))
     mna_total = Column(DECIMAL(10, 2))
     result_category = Column(String(50), index=True)
@@ -486,10 +583,13 @@ class BIARecord(Base):
     fat_mass_kg = Column(DECIMAL(5, 2))
     body_fat_percentage = Column(DECIMAL(5, 2))
     visceral_fat_kg = Column(DECIMAL(5, 2))
+    visceral_fat_level = Column(DECIMAL(5, 2))
     muscle_mass_kg = Column(DECIMAL(5, 2))
     bone_mass_kg = Column(DECIMAL(5, 2))
     water_percentage = Column(DECIMAL(5, 2))
     metabolic_rate = Column(Integer)
+    mac_cm = Column(DECIMAL(5, 2))
+    cc_cm = Column(DECIMAL(5, 2))
 
     # Additional measurements
     hip_circumference_cm = Column(DECIMAL(5, 2))
@@ -501,6 +601,7 @@ class BIARecord(Base):
 
     # Staff info
     measured_by = Column(Integer, ForeignKey("users.id"))
+    source_staff_id = Column(String(100), nullable=True)
     staff_signature = Column(String(255))
     measurement_date = Column(Date)
 
@@ -512,6 +613,8 @@ class BIARecord(Base):
     # Relationships
     visit = relationship("Visit", back_populates="bia_records")
     measurer = relationship("User", back_populates="bia_records")
+
+    __table_args__ = (UniqueConstraint("visit_id", name="uq_bia_visit"),)
 
 
 class FoodDiaryEntry(Base):
@@ -577,6 +680,8 @@ class KnowledgePost(Base):
     content = Column(Text)
     summary = Column(Text)
     featured_image_path = Column(String(500))
+    media_path = Column(String(500))
+    media_type = Column(String(20))
     category = Column(String(100), index=True)
     tags = Column(String(255))
 
@@ -616,3 +721,27 @@ class AuditLog(Base):
     created_at = Column(TIMESTAMP, server_default=func.now(), index=True)
 
     __table_args__ = (Index("idx_table_record", "table_name", "record_id"),)
+
+
+class AssessmentRevision(Base):
+    """Immutable snapshot of an MNA/BIA record after every successful write."""
+
+    __tablename__ = "assessment_revisions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    respondent_id = Column(Integer, ForeignKey("respondents.id", ondelete="CASCADE"), nullable=False, index=True)
+    visit_id = Column(Integer, ForeignKey("visits.id", ondelete="CASCADE"), nullable=False, index=True)
+    instrument = Column(String(20), nullable=False, index=True)
+    record_id = Column(Integer, nullable=False, index=True)
+    revision_number = Column(Integer, nullable=False)
+    action_type = Column(String(20), nullable=False)
+    snapshot = Column(JSON, nullable=False)
+    changed_by = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    change_reason = Column(String(255), nullable=True)
+    is_current = Column(Boolean, nullable=False, default=True, index=True)
+    recorded_at = Column(TIMESTAMP, server_default=func.now(), nullable=False, index=True)
+
+    __table_args__ = (
+        UniqueConstraint("instrument", "record_id", "revision_number", name="uq_assessment_revision"),
+        Index("idx_assessment_history", "respondent_id", "instrument", "recorded_at"),
+    )

@@ -1,4 +1,5 @@
 import apiClient from "@/lib/api";
+import { chronicDiseaseOptions, demographicOptions, incomeSourceOptions } from "@/lib/researchLabels";
 import { Respondent, VisitCreate } from "@/types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
@@ -8,23 +9,25 @@ import { z } from "zod";
 
 // Complete General Information Schema - 10 fields from Page 2
 const generalInfoSchema = z.object({
-  status: z.enum(["elderly", "caregiver"]).optional(), // ผู้สูงอายุ/ผู้ดูแล
-  age: z.number().min(0).max(150).optional(),
-  sex: z.enum(["male", "female"]).optional(),
-  education_level: z.string().optional(),
-  marital_status: z.string().optional(),
-  monthly_income: z.string().optional(),
-  income_sources: z.array(z.string()).optional(), // Multiple selections
+  status: z.enum(["elderly", "caregiver"]),
+  age: z.number({ invalid_type_error: "กรุณากรอกอายุ" }).min(60, "อายุต้องไม่น้อยกว่า 60 ปี").max(150),
+  sex: z.enum(["male", "female"]),
+  education_level: z.enum(["no_education", "primary", "secondary", "vocational", "bachelor", "graduate"]),
+  marital_status: z.enum(["single", "married", "widowed", "divorced"]),
+  monthly_income: z.enum(["under_10k", "10k_20k", "20k_30k", "over_30k"]),
+  income_sources: z.array(z.enum(["old_age", "pension", "spouse", "children", "work"])),
   chronic_diseases: z
     .object({
-      diseases: z.array(z.string()),
-      other: z.string().optional(),
+      diseases: z.array(z.enum(["dm", "ht", "dlp", "ckd", "ca"])),
+      other: z.string(),
     })
-    .optional(),
-  living_arrangement: z.string().optional(),
+    ,
+  living_arrangement: z.enum(["alone", "with_spouse", "with_friends", "with_family"]),
 });
 
 type GeneralInfoForm = z.infer<typeof generalInfoSchema>;
+type IncomeSource = GeneralInfoForm["income_sources"][number];
+type ChronicDisease = GeneralInfoForm["chronic_diseases"]["diseases"][number];
 
 export default function GeneralInfoPage() {
   const { respondentCode } = useParams<{ respondentCode: string }>();
@@ -32,9 +35,11 @@ export default function GeneralInfoPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [respondent, setRespondent] = useState<Respondent | null>(null);
-  const [incomeSourcesChecked, setIncomeSourcesChecked] = useState<string[]>([]);
-  const [chronicDiseasesChecked, setChronicDiseasesChecked] = useState<string[]>([]);
+  const [incomeSourcesChecked, setIncomeSourcesChecked] = useState<IncomeSource[]>([]);
+  const [chronicDiseasesChecked, setChronicDiseasesChecked] = useState<ChronicDisease[]>([]);
   const [chronicDiseasesOther, setChronicDiseasesOther] = useState("");
+  const [incomeAnswered, setIncomeAnswered] = useState(false);
+  const [diseaseAnswered, setDiseaseAnswered] = useState(false);
 
   const {
     register,
@@ -43,6 +48,7 @@ export default function GeneralInfoPage() {
     setValue,
   } = useForm<GeneralInfoForm>({
     resolver: zodResolver(generalInfoSchema),
+    defaultValues: { income_sources: [], chronic_diseases: { diseases: [], other: "" } },
   });
 
   useEffect(() => {
@@ -56,17 +62,21 @@ export default function GeneralInfoPage() {
           setValue("status", response.data.status as "elderly" | "caregiver");
         if (response.data.age) setValue("age", response.data.age);
         if (response.data.sex) setValue("sex", response.data.sex as "male" | "female");
-        if (response.data.education_level)
-          setValue("education_level", response.data.education_level);
-        if (response.data.marital_status) setValue("marital_status", response.data.marital_status);
-        if (response.data.monthly_income) setValue("monthly_income", response.data.monthly_income);
+        if (response.data.education_level && response.data.education_level in demographicOptions.education_level)
+          setValue("education_level", response.data.education_level as GeneralInfoForm["education_level"]);
+        if (response.data.marital_status && response.data.marital_status in demographicOptions.marital_status)
+          setValue("marital_status", response.data.marital_status as GeneralInfoForm["marital_status"]);
+        if (response.data.monthly_income && response.data.monthly_income in demographicOptions.monthly_income)
+          setValue("monthly_income", response.data.monthly_income as GeneralInfoForm["monthly_income"]);
         if (response.data.income_sources) {
-          setValue("income_sources", response.data.income_sources);
-          setIncomeSourcesChecked(response.data.income_sources);
+          const sources = response.data.income_sources.filter((item): item is IncomeSource => item in incomeSourceOptions);
+          setValue("income_sources", sources);
+          setIncomeSourcesChecked(sources);
+          setIncomeAnswered(true);
         }
         if (response.data.chronic_diseases) {
           const diseases = Array.isArray(response.data.chronic_diseases.diseases)
-            ? response.data.chronic_diseases.diseases
+            ? response.data.chronic_diseases.diseases.filter((item): item is ChronicDisease => typeof item === "string" && item in chronicDiseaseOptions)
             : [];
           const other =
             typeof response.data.chronic_diseases.other === "string"
@@ -75,9 +85,10 @@ export default function GeneralInfoPage() {
           setValue("chronic_diseases", { diseases, other });
           setChronicDiseasesChecked(diseases);
           setChronicDiseasesOther(other);
+          setDiseaseAnswered(true);
         }
-        if (response.data.living_arrangement)
-          setValue("living_arrangement", response.data.living_arrangement);
+        if (response.data.living_arrangement && response.data.living_arrangement in demographicOptions.living_arrangement)
+          setValue("living_arrangement", response.data.living_arrangement as GeneralInfoForm["living_arrangement"]);
       } catch (err) {
         setError("ไม่สามารถโหลดข้อมูลผู้ตอบได้");
       }
@@ -88,7 +99,8 @@ export default function GeneralInfoPage() {
     }
   }, [respondentCode, setValue]);
 
-  const handleIncomeSourceChange = (source: string, checked: boolean) => {
+  const handleIncomeSourceChange = (source: IncomeSource, checked: boolean) => {
+    setIncomeAnswered(true);
     const updated = checked
       ? [...incomeSourcesChecked, source]
       : incomeSourcesChecked.filter((s) => s !== source);
@@ -96,7 +108,8 @@ export default function GeneralInfoPage() {
     setValue("income_sources", updated);
   };
 
-  const handleChronicDiseaseChange = (disease: string, checked: boolean) => {
+  const handleChronicDiseaseChange = (disease: ChronicDisease, checked: boolean) => {
+    setDiseaseAnswered(true);
     const updated = checked
       ? [...chronicDiseasesChecked, disease]
       : chronicDiseasesChecked.filter((d) => d !== disease);
@@ -108,31 +121,29 @@ export default function GeneralInfoPage() {
   };
 
   const onSubmit = async (data: GeneralInfoForm) => {
+    if (!incomeAnswered || !diseaseAnswered) {
+      setError("กรุณาตอบแหล่งรายได้และโรคประจำตัว โดยเลือก ‘ไม่มี’ หากไม่มีข้อมูลในส่วนนั้น");
+      return;
+    }
     setLoading(true);
     setError(null);
 
     try {
       // Update respondent info
       if (respondent) {
-        await apiClient.put(`/respondents/${respondent.id}`, data);
+        await apiClient.put(`/respondents/${respondent.id}/profile`, data);
       }
 
-      // Check if visit exists, if not create one
-      try {
-        const visitsResponse = await apiClient.get(`/visits/respondent/${respondent!.id}`);
-        if (visitsResponse.data.length === 0) {
-          // Create visit only if none exists
-          const visitData: VisitCreate = {
-            respondent_id: respondent!.id,
-            visit_number: 1,
-            visit_date: new Date().toISOString().split("T")[0],
-            visit_type: "baseline",
-          };
-          await apiClient.post("/visits", visitData);
-        }
-      } catch (visitErr) {
-        // If checking visits fails, try to create one anyway
-        console.log("Could not check existing visits, creating new one");
+      // Create a first visit only after the complete profile was accepted.
+      const visitsResponse = await apiClient.get(`/visits/respondent/${respondent!.id}`);
+      if (visitsResponse.data.length === 0) {
+        const visitData: VisitCreate = {
+          respondent_id: respondent!.id,
+          visit_number: 1,
+          visit_date: new Date().toISOString().split("T")[0],
+          visit_type: "baseline",
+        };
+        await apiClient.post("/visits", visitData);
       }
 
       // Navigate to SANSA form
@@ -175,7 +186,7 @@ export default function GeneralInfoPage() {
         )}
 
         {/* Form */}
-        <form onSubmit={handleSubmit(onSubmit)} className="bg-white rounded-2xl shadow-xl p-8">
+        <form onSubmit={handleSubmit(onSubmit, () => setError("กรุณากรอกข้อมูลทั่วไปที่มีเครื่องหมาย * ให้ครบ"))} className="bg-white rounded-2xl shadow-xl p-8">
           <div className="space-y-8">
             {/* 1. Status - สถานะ */}
             <div>
@@ -247,108 +258,106 @@ export default function GeneralInfoPage() {
 
             {/* 4. Education Level - ระดับการศึกษา */}
             <div>
-              <label className="block text-gray-800 font-bold text-lg mb-3">4. ระดับการศึกษา</label>
+              <label className="block text-gray-800 font-bold text-lg mb-3">4. ระดับการศึกษา <span className="text-red-500">*</span></label>
               <select
                 {...register("education_level")}
                 className="w-full px-5 py-4 text-lg border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">เลือก...</option>
-                <option value="no_education">ไม่ได้เรียนหนังสือ</option>
-                <option value="primary">ประถมศึกษา</option>
-                <option value="secondary">มัธยมศึกษา</option>
-                <option value="vocational">ปวช./ปวส.</option>
-                <option value="bachelor">ปริญญาตรี</option>
-                <option value="graduate">สูงกว่าปริญญาตรี</option>
+                {Object.entries(demographicOptions.education_level).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
               </select>
             </div>
 
             {/* 5. Marital Status - สถานภาพการสมรส */}
             <div>
               <label className="block text-gray-800 font-bold text-lg mb-3">
-                5. สถานภาพการสมรส
+                5. สถานภาพการสมรส <span className="text-red-500">*</span>
               </label>
               <select
                 {...register("marital_status")}
                 className="w-full px-5 py-4 text-lg border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">เลือก...</option>
-                <option value="single">โสด</option>
-                <option value="married">สมรส</option>
-                <option value="divorced">หย่าร้าง</option>
-                <option value="widowed">หม้าย</option>
+                {Object.entries(demographicOptions.marital_status).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
               </select>
             </div>
 
             {/* 6. Monthly Income - รายได้ต่อเดือน */}
             <div>
               <label className="block text-gray-800 font-bold text-lg mb-3">
-                6. รายได้ต่อเดือน (บาท)
+                6. รายได้ต่อเดือน (บาท) <span className="text-red-500">*</span>
               </label>
               <select
                 {...register("monthly_income")}
                 className="w-full px-5 py-4 text-lg border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">เลือก...</option>
-                <option value="under_5k">น้อยกว่า 5,000</option>
-                <option value="5k_10k">5,000 - 10,000</option>
-                <option value="10k_20k">10,000 - 20,000</option>
-                <option value="over_20k">มากกว่า 20,000</option>
+                {Object.entries(demographicOptions.monthly_income).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
               </select>
             </div>
 
             {/* 7. Income Sources - แหล่งรายได้ (Multiple) */}
             <div>
               <label className="block text-gray-800 font-bold text-lg mb-3">
-                7. แหล่งรายได้ (เลือกได้มากกว่า 1 ข้อ)
+                7. แหล่งรายได้ (เลือกได้มากกว่า 1 ข้อ) <span className="text-red-500">*</span>
               </label>
               <div className="space-y-2">
-                {["เงินเดือน/ค่าจ้าง", "เงินบำนาญ", "ลูกหลานให้", "ดอกเบี้ยเงินฝาก", "อื่นๆ"].map(
-                  (source) => (
+                {Object.entries(incomeSourceOptions).map(
+                  ([source, label]) => (
                     <label
                       key={source}
                       className="flex items-center p-4 border-2 border-gray-200 rounded-xl hover:border-blue-400 cursor-pointer"
                     >
                       <input
                         type="checkbox"
-                        checked={incomeSourcesChecked.includes(source)}
-                        onChange={(e) => handleIncomeSourceChange(source, e.target.checked)}
+                        checked={incomeSourcesChecked.includes(source as IncomeSource)}
+                        onChange={(e) => handleIncomeSourceChange(source as IncomeSource, e.target.checked)}
                         className="w-5 h-5 text-blue-600 rounded"
                       />
-                      <span className="ml-3 text-gray-700 font-medium">{source}</span>
+                      <span className="ml-3 text-gray-700 font-medium">{label}</span>
                     </label>
                   ),
                 )}
+                <label className="flex items-center p-4 border-2 border-gray-200 rounded-xl hover:border-blue-400 cursor-pointer">
+                  <input type="checkbox" checked={incomeAnswered && incomeSourcesChecked.length === 0} onChange={() => { setIncomeAnswered(true); setIncomeSourcesChecked([]); setValue("income_sources", []); }} className="w-5 h-5 text-blue-600 rounded" />
+                  <span className="ml-3 text-gray-700 font-medium">ไม่มีแหล่งรายได้ตามรายการ</span>
+                </label>
               </div>
             </div>
 
             {/* 8. Chronic Diseases - โรคประจำตัว (Multiple + Other) */}
             <div>
               <label className="block text-gray-800 font-bold text-lg mb-3">
-                8. โรคประจำตัว (เลือกได้มากกว่า 1 ข้อ)
+                8. โรคประจำตัว (เลือกได้มากกว่า 1 ข้อ) <span className="text-red-500">*</span>
               </label>
               <div className="space-y-2">
-                {["เบาหวาน", "ความดันโลหิตสูง", "ไขมันในเลือดสูง", "โรคหัวใจ", "ไม่มี"].map(
-                  (disease) => (
+                {Object.entries(chronicDiseaseOptions).map(
+                  ([disease, label]) => (
                     <label
                       key={disease}
                       className="flex items-center p-4 border-2 border-gray-200 rounded-xl hover:border-blue-400 cursor-pointer"
                     >
                       <input
                         type="checkbox"
-                        checked={chronicDiseasesChecked.includes(disease)}
-                        onChange={(e) => handleChronicDiseaseChange(disease, e.target.checked)}
+                        checked={chronicDiseasesChecked.includes(disease as ChronicDisease)}
+                        onChange={(e) => handleChronicDiseaseChange(disease as ChronicDisease, e.target.checked)}
                         className="w-5 h-5 text-blue-600 rounded"
                       />
-                      <span className="ml-3 text-gray-700 font-medium">{disease}</span>
+                      <span className="ml-3 text-gray-700 font-medium">{label}</span>
                     </label>
                   ),
                 )}
+                <label className="flex items-center p-4 border-2 border-gray-200 rounded-xl hover:border-blue-400 cursor-pointer">
+                  <input type="checkbox" checked={diseaseAnswered && chronicDiseasesChecked.length === 0 && !chronicDiseasesOther.trim()} onChange={() => { setDiseaseAnswered(true); setChronicDiseasesChecked([]); setChronicDiseasesOther(""); setValue("chronic_diseases", { diseases: [], other: "" }); }} className="w-5 h-5 text-blue-600 rounded" />
+                  <span className="ml-3 text-gray-700 font-medium">ไม่มีโรคประจำตัวตามรายการ</span>
+                </label>
                 <div className="mt-3">
                   <label className="block text-gray-700 mb-2">อื่นๆ (ระบุ)</label>
                   <input
                     type="text"
                     value={chronicDiseasesOther}
                     onChange={(e) => {
+                      setDiseaseAnswered(true);
                       setChronicDiseasesOther(e.target.value);
                       setValue("chronic_diseases", {
                         diseases: chronicDiseasesChecked,
@@ -365,17 +374,14 @@ export default function GeneralInfoPage() {
             {/* 9. Living Arrangement - ท่านอาศัยอยู่กับ */}
             <div>
               <label className="block text-gray-800 font-bold text-lg mb-3">
-                9. ท่านอาศัยอยู่กับ
+                9. ท่านอาศัยอยู่กับ <span className="text-red-500">*</span>
               </label>
               <select
                 {...register("living_arrangement")}
                 className="w-full px-5 py-4 text-lg border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">เลือก...</option>
-                <option value="alone">อยู่คนเดียว</option>
-                <option value="with_spouse">อยู่กับคู่สมรส</option>
-                <option value="with_children">อยู่กับลูกหลาน</option>
-                <option value="with_relatives">อยู่กับญาติ</option>
+                {Object.entries(demographicOptions.living_arrangement).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
               </select>
             </div>
           </div>

@@ -1,5 +1,6 @@
 import apiClient from "@/lib/api";
 import AdminLayout from "@/pages/admin/AdminLayout";
+import { AdminPageHeader } from "@/pages/admin/AdminPageUI";
 import { useAuthStore } from "@/stores/authStore";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -63,6 +64,8 @@ export default function AdminScoringPage() {
     () => versions.find((v) => v.id === selectedId) || null,
     [versions, selectedId],
   );
+  const isApprovedSansa = selected?.instrument_name === "SANSA" && selected.version_number === "0.2.4-20261008";
+  const isLegacySansa = selected?.instrument_name === "SANSA" && !isApprovedSansa;
 
   const updateLocalValue = (valueId: number, patch: Partial<ScoringValue>) => {
     setVersions((prev) =>
@@ -112,9 +115,10 @@ export default function AdminScoringPage() {
 
   return (
     <AdminLayout title="กฎการให้คะแนน">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">กฎการให้คะแนน</h1>
-        <p className="text-gray-600">ดู/แก้ไข threshold และคำแนะนำ (เฉพาะ admin)</p>
+      <AdminPageHeader icon="scoring" title="กฎการให้คะแนน" description="ดูและจัดการเกณฑ์คะแนนของแบบประเมินแต่ละเวอร์ชัน" />
+
+      <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-950">
+        SANSA ใช้นิยาม 0/2/4 ที่อนุมัติเป็นแหล่งคะแนนกลางเพียงชุดเดียว ส่วนผลลัพธ์ใช้ Model 3 และไม่ใช้ช่วงคะแนนรวมแบบเดิม
       </div>
 
       {error && (
@@ -123,9 +127,11 @@ export default function AdminScoringPage() {
         </div>
       )}
 
-      <div className="bg-white rounded-xl shadow border border-gray-200 p-4 mb-6 flex flex-wrap items-center gap-3">
+      <div className="sansa-panel p-5 mb-6 flex flex-wrap items-center gap-3">
         <div className="text-sm text-gray-600">เลือกเวอร์ชัน:</div>
         <select
+          aria-label="เวอร์ชันกฎคะแนน"
+          title="เลือกชุดกฎคะแนนที่ต้องการตรวจสอบหรือแก้ไข"
           value={selectedId ?? ""}
           onChange={(e) => setSelectedId(parseInt(e.target.value))}
           className="px-3 py-2 border-2 border-gray-200 rounded-lg"
@@ -142,7 +148,7 @@ export default function AdminScoringPage() {
         </button>
       </div>
 
-      <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
+      <div className="sansa-panel overflow-hidden">
         {loading ? (
           <div className="p-6 text-gray-600">กำลังโหลด...</div>
         ) : !selected ? (
@@ -156,8 +162,9 @@ export default function AdminScoringPage() {
                 </div>
                 <div className="text-sm text-gray-600">{selected.description || ""}</div>
               </div>
-              {user?.role === "admin" && (
+              {user?.role === "admin" && selected.instrument_name !== "SANSA" && (
                 <button
+                  title="ใช้เวอร์ชันนี้เป็นเกณฑ์หลักสำหรับการประเมินใหม่"
                   onClick={() => activateVersion(selected.id)}
                   className="px-4 py-2 border-2 border-primary-600 text-primary-700 rounded-lg hover:bg-primary-50"
                 >
@@ -167,6 +174,8 @@ export default function AdminScoringPage() {
             </div>
 
             <div className="overflow-x-auto">
+              {isApprovedSansa&&selected.rule_values.length===0&&<p className="p-6 text-slate-600">คะแนนรายข้ออยู่ในนิยาม 0/2/4 กลางและไม่แก้ผ่านตารางช่วงคะแนนหน้านี้</p>}
+              {isLegacySansa&&<p className="m-5 rounded-xl bg-amber-50 p-4 text-amber-900">เวอร์ชันเดิมแสดงเพื่อการตรวจสอบประวัติเท่านั้น ไม่สามารถเปิดใช้หรือแก้เป็นเกณฑ์ปัจจุบันได้</p>}
               <table className="min-w-full text-sm">
                 <thead className="bg-white">
                   <tr>
@@ -184,40 +193,48 @@ export default function AdminScoringPage() {
                       <td className="px-4 py-3 font-mono">{rv.level_code}</td>
                       <td className="px-4 py-3">
                         <input
+                          aria-label={`ชื่อระดับ ${rv.level_code}`}
+                          title="ชื่อผลลัพธ์ที่แสดงเมื่อคะแนนอยู่ในช่วงนี้"
                           value={rv.level_name}
                           onChange={(e) => updateLocalValue(rv.id, { level_name: e.target.value })}
-                          disabled={user?.role !== "admin"}
+                          disabled={user?.role !== "admin" || isLegacySansa}
                           className="w-56 px-3 py-2 border-2 border-gray-200 rounded-lg disabled:bg-gray-50"
                         />
                       </td>
                       <td className="px-4 py-3">
                         <input
+                          aria-label={`คะแนนต่ำสุด ${rv.level_code}`}
+                          title="คะแนนต่ำสุดที่รวมอยู่ในระดับนี้"
                           value={rv.min_score ?? ""}
                           onChange={(e) => updateLocalValue(rv.id, { min_score: e.target.value })}
-                          disabled={user?.role !== "admin"}
+                          disabled={user?.role !== "admin" || isLegacySansa}
                           className="w-24 px-3 py-2 border-2 border-gray-200 rounded-lg disabled:bg-gray-50"
                         />
                       </td>
                       <td className="px-4 py-3">
                         <input
+                          aria-label={`คะแนนสูงสุด ${rv.level_code}`}
+                          title="คะแนนสูงสุดที่รวมอยู่ในระดับนี้"
                           value={rv.max_score ?? ""}
                           onChange={(e) => updateLocalValue(rv.id, { max_score: e.target.value })}
-                          disabled={user?.role !== "admin"}
+                          disabled={user?.role !== "admin" || isLegacySansa}
                           className="w-24 px-3 py-2 border-2 border-gray-200 rounded-lg disabled:bg-gray-50"
                         />
                       </td>
                       <td className="px-4 py-3">
                         <textarea
+                          aria-label={`คำแนะนำ ${rv.level_code}`}
+                          title="คำแนะนำที่แสดงแก่ผู้ทำแบบประเมินในระดับนี้"
                           value={rv.advice_text ?? ""}
                           onChange={(e) => updateLocalValue(rv.id, { advice_text: e.target.value })}
-                          disabled={user?.role !== "admin"}
+                          disabled={user?.role !== "admin" || isLegacySansa}
                           className="w-96 min-h-20 px-3 py-2 border-2 border-gray-200 rounded-lg disabled:bg-gray-50"
                         />
                       </td>
                       <td className="px-4 py-3 text-right">
                         <button
                           onClick={() => saveValue(rv.id)}
-                          disabled={user?.role !== "admin" || savingId !== null}
+                          disabled={user?.role !== "admin" || isLegacySansa || savingId !== null}
                           className="text-primary-600 hover:text-primary-700 font-medium disabled:opacity-50"
                         >
                           {savingId === rv.id ? "กำลังบันทึก..." : "บันทึก"}

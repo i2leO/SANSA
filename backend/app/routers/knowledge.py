@@ -56,7 +56,7 @@ def list_knowledge_posts(
     """
     query = db.query(KnowledgePost).filter(KnowledgePost.is_deleted == False)
 
-    if not current_user or not include_unpublished:
+    if not current_user or current_user.role not in ("staff", "admin") or not include_unpublished:
         query = query.filter(KnowledgePost.is_published == True)
 
     return query.order_by(
@@ -95,6 +95,9 @@ def create_knowledge_post(
         summary=payload.summary,
         category=payload.category,
         tags=payload.tags,
+        featured_image_path=payload.featured_image_path,
+        media_path=payload.media_path,
+        media_type=payload.media_type,
         is_published=payload.is_published,
         published_at=datetime.utcnow() if payload.is_published else None,
         display_order=payload.display_order,

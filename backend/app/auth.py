@@ -54,7 +54,7 @@ def create_refresh_token(data: dict) -> str:
     return encoded_jwt
 
 
-def decode_token(token: str) -> TokenData:
+def decode_token(token: str, expected_type: Optional[str] = None) -> TokenData:
     """Decode and verify JWT token"""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -62,25 +62,27 @@ def decode_token(token: str) -> TokenData:
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        print(f"DEBUG decode_token: token={token[:50]}...")
-        print(f"DEBUG decode_token: secret={settings.JWT_SECRET_KEY}")
-        print(f"DEBUG decode_token: algorithm={settings.JWT_ALGORITHM}")
         payload = jwt.decode(
             token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
         )
-        print(f"DEBUG decode_token: payload={payload}")
         user_id_str: str = payload.get("sub")
         if user_id_str is None:
-            print("DEBUG decode_token: user_id is None!")
+            raise credentials_exception
+        token_type = payload.get("type")
+        if expected_type and token_type != expected_type:
             raise credentials_exception
         user_id: int = int(user_id_str)
         username: str = payload.get("username")
         role: str = payload.get("role")
-        token_data = TokenData(user_id=user_id, username=username, role=role)
-        print(f"DEBUG decode_token: Success! token_data={token_data}")
+        token_data = TokenData(
+            user_id=user_id,
+            username=username,
+            role=role,
+            qr_version=payload.get("qr_version"),
+            token_type=token_type,
+        )
         return token_data
     except JWTError as e:
-        print(f"DEBUG decode_token: JWTError={e}")
         raise credentials_exception
 
 
@@ -91,20 +93,16 @@ async def get_current_user(
     """Get current authenticated user"""
     try:
         token = credentials.credentials
-        print(f"DEBUG: Received token: {token[:50]}...")
-        token_data = decode_token(token)
-        print(
-            f"DEBUG: Token data: user_id={token_data.user_id}, username={token_data.username}"
-        )
+        token_data = decode_token(token, expected_type="access")
         user = db.query(User).filter(User.id == token_data.user_id).first()
-        print(f"DEBUG: User found: {user}")
         if user is None:
             raise HTTPException(status_code=404, detail="User not found")
         if not user.is_active:
             raise HTTPException(status_code=400, detail="Inactive user")
+        if token_data.qr_version and user.qr_secret_hash != token_data.qr_version:
+            raise HTTPException(status_code=401, detail="QR session has been revoked")
         return user
     except Exception as e:
-        print(f"DEBUG: Error in get_current_user: {e}")
         raise
 
 
@@ -143,7 +141,7 @@ async def get_current_user_optional(
 
     try:
         token = credentials.credentials
-        token_data = decode_token(token)
+        token_data = decode_token(token, expected_type="access")
         user = db.query(User).filter(User.id == token_data.user_id).first()
         if user and user.is_active:
             return user

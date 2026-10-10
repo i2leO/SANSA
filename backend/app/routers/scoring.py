@@ -4,6 +4,7 @@ from decimal import Decimal
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.auth import get_current_active_admin, get_current_staff_or_admin
@@ -14,6 +15,7 @@ from app.schemas import (
     ScoringRuleValueResponse,
     ScoringRuleVersionResponse,
 )
+from app.services.sansa_definition import DB_SCORING_VERSION
 
 router = APIRouter(prefix="/scoring", tags=["scoring"])
 
@@ -27,7 +29,10 @@ def list_scoring_versions(
 ):
     query = db.query(ScoringRuleVersion).options(
         joinedload(ScoringRuleVersion.scoring_rule_values)
-    )
+    ).filter(or_(
+        ScoringRuleVersion.instrument_name != "SANSA",
+        ScoringRuleVersion.version_number == DB_SCORING_VERSION,
+    ))
 
     if instrument_name:
         query = query.filter(ScoringRuleVersion.instrument_name == instrument_name)
@@ -58,6 +63,11 @@ def update_scoring_value(
     value = db.query(ScoringRuleValue).filter(ScoringRuleValue.id == value_id).first()
     if not value:
         raise HTTPException(status_code=404, detail="Scoring value not found")
+    if value.version.instrument_name == "SANSA":
+        raise HTTPException(
+            status_code=409,
+            detail="SANSA 0/2/4 ใช้นิยามกลางที่อนุมัติและไม่ใช้ช่วงคะแนนรวมหน้านี้",
+        )
 
     if min_score is not None:
         value.min_score = min_score
@@ -86,6 +96,11 @@ def activate_scoring_version(
     )
     if not version:
         raise HTTPException(status_code=404, detail="Scoring version not found")
+    if version.instrument_name == "SANSA":
+        raise HTTPException(
+            status_code=409,
+            detail="SANSA ใช้นิยามกลาง 0/2/4 เพียงชุดเดียวและไม่อนุญาตให้สลับเวอร์ชัน",
+        )
 
     # Deactivate other versions for the same instrument
     (

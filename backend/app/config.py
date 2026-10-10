@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+from pydantic import model_validator
 
 
 class Settings(BaseSettings):
@@ -30,6 +31,17 @@ class Settings(BaseSettings):
     ADMIN_USERNAME: str = "admin"
     ADMIN_PASSWORD: str = "admin123"
     ADMIN_EMAIL: str = "admin@sansa.local"
+
+    @model_validator(mode="after")
+    def validate_production_settings(self):
+        if self.APP_MODE.lower() == "production":
+            if self.JWT_SECRET_KEY == "your-secret-key-change-in-production" or len(self.JWT_SECRET_KEY) < 32:
+                raise ValueError("Production requires an explicit JWT secret of at least 32 characters")
+            if "DATABASE_URL" not in self.model_fields_set or "/Applications/MAMP/" in self.DATABASE_URL:
+                raise ValueError("Production requires an explicit production DATABASE_URL")
+            if self.DEBUG:
+                raise ValueError("Production requires DEBUG=False")
+        return self
 
     class Config:
         env_file = ".env"

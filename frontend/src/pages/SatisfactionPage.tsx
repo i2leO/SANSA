@@ -27,21 +27,36 @@ export default function SatisfactionPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    const ratings = [formData.q1_clarity, formData.q2_ease_of_use, formData.q3_confidence,
+      formData.q4_presentation, formData.q5_results_display, formData.q6_usefulness,
+      formData.q7_overall_satisfaction];
+    if (ratings.some((value) => value === "")) {
+      setError("กรุณาตอบแบบประเมินความพึงพอใจให้ครบทั้ง 7 ข้อ");
+      return;
+    }
     setIsSubmitting(true);
 
     try {
       // Submit satisfaction survey
       await apiClient.post("/satisfaction", {
         visit_id: parseInt(visitId || "0"),
-        ...formData,
+        q1_clarity: Number(formData.q1_clarity),
+        q2_ease_of_use: Number(formData.q2_ease_of_use),
+        q3_confidence: Number(formData.q3_confidence),
+        q4_presentation: Number(formData.q4_presentation),
+        q5_results_display: Number(formData.q5_results_display),
+        q6_usefulness: Number(formData.q6_usefulness),
+        q7_overall_satisfaction: Number(formData.q7_overall_satisfaction),
+        comments: formData.comments.trim() || null,
       });
 
       // Navigate to results page
       navigate(`/result/${visitId}`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error submitting satisfaction survey:", err);
+      const failure = err as { response?: { data?: { detail?: string } } };
       setError(
-        err.response?.data?.detail || "เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาลองใหม่อีกครั้ง",
+        failure.response?.data?.detail || "เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาลองใหม่อีกครั้ง",
       );
     } finally {
       setIsSubmitting(false);
@@ -187,6 +202,7 @@ export default function SatisfactionPage() {
                     >
                       <input
                         type="radio"
+                        required
                         name={question.id}
                         value={option.value}
                         checked={formData[question.id as keyof typeof formData] === option.value}

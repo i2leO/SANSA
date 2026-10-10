@@ -1,0 +1,5 @@
+export default function TableControls({search,onSearch,page,onPage,size,onSize,total,mode='search'}:{search:string;onSearch:(value:string)=>void;page:number;onPage:(value:number)=>void;size:number;onSize:(value:number)=>void;total:number;mode?:'search'|'pagination'}) {
+  const pages=Math.max(1,Math.ceil(total/size));
+  if(mode==='search') return <div className="sansa-table-search"><span aria-hidden>⌕</span><input aria-label="ค้นหาในรายการ" title="พิมพ์คำที่ต้องการค้นหาในรายการด้านล่าง" placeholder="พิมพ์คำค้นหา..." value={search} onChange={e=>onSearch(e.target.value)} /></div>;
+  return <div className="sansa-table-pagination"><span>แสดง {total===0?0:page*size+1}–{Math.min((page+1)*size,total)} จาก {total.toLocaleString()} รายการ</span><div><select aria-label="จำนวนรายการต่อหน้า" value={size} onChange={e=>onSize(Number(e.target.value))}>{[10,25,50].map(n=><option key={n} value={n}>{n} / หน้า</option>)}</select><button aria-label="หน้าก่อนหน้า" disabled={page<=0} onClick={()=>onPage(page-1)}>‹</button><span>{page+1} / {pages}</span><button aria-label="หน้าถัดไป" disabled={page+1>=pages} onClick={()=>onPage(page+1)}>›</button></div></div>;
+}

@@ -11,6 +11,7 @@ from app.schemas import (
     UserUpdate,
     UserResponse,
     MessageResponse,
+    RefreshTokenRequest,
 )
 from app.auth import (
     authenticate_user,
@@ -63,10 +64,10 @@ def login(
 
 
 @router.post("/refresh", response_model=Token)
-def refresh_token(refresh_token: str, db: Session = Depends(get_db)):
+def refresh_token(payload: RefreshTokenRequest, db: Session = Depends(get_db)):
     """Refresh access token using refresh token"""
     try:
-        token_data = decode_token(refresh_token)
+        token_data = decode_token(payload.refresh_token, expected_type="refresh")
     except HTTPException:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token"
@@ -78,15 +79,27 @@ def refresh_token(refresh_token: str, db: Session = Depends(get_db)):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found or inactive",
         )
+    if token_data.qr_version and user.qr_secret_hash != token_data.qr_version:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="QR session has been revoked")
 
     # Create new tokens
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": str(user.id), "username": user.username, "role": user.role},
+        data={
+            "sub": str(user.id),
+            "username": user.username,
+            "role": user.role,
+            **({"qr_version": token_data.qr_version} if token_data.qr_version else {}),
+        },
         expires_delta=access_token_expires,
     )
     new_refresh_token = create_refresh_token(
-        data={"sub": str(user.id), "username": user.username, "role": user.role}
+        data={
+            "sub": str(user.id),
+            "username": user.username,
+            "role": user.role,
+            **({"qr_version": token_data.qr_version} if token_data.qr_version else {}),
+        }
     )
 
     return {

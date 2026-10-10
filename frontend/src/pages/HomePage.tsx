@@ -1,164 +1,43 @@
-import type { ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link } from 'react-router-dom';
 
-type HomeTileProps = {
-  to: string;
-  ariaLabel: string;
-  label: ReactNode;
-  illustration: ReactNode;
-  className?: string;
-  heightClassName?: string;
-  pillVariant?: "filled" | "outline";
-  frameWidthClassName?: string;
-  frameHeightClassName?: string;
-};
-
-function HomeTile({
-  to,
-  ariaLabel,
-  label,
-  illustration,
-  className,
-  heightClassName,
-  pillVariant = "filled",
-  frameWidthClassName = "w-[160px] md:w-[190px]",
-  frameHeightClassName = "h-[90px] md:h-[110px]",
-}: HomeTileProps) {
-  const pillClassName =
-    pillVariant === "outline"
-      ? "bg-primary-700 border border-primary-700 text-white shadow-sm transition-colors duration-200 group-hover:bg-white group-hover:text-primary-800"
-      : "bg-primary-700 border border-primary-700 text-white shadow-sm transition-colors duration-200 group-hover:bg-white group-hover:text-primary-800";
-
-  return (
-    <Link
-      to={to}
-      aria-label={ariaLabel}
-      className={"group block focus:outline-none " + (className ?? "")}
-    >
-      <div className={heightClassName ?? "h-[190px] md:h-[205px] lg:h-[220px]"}>
-        <div className="h-full rounded-[30px] bg-primary-100/70 border border-primary-200 shadow-sm flex flex-col items-center justify-between px-5 md:px-7 py-5 md:py-6">
-          <div
-            className={
-              "rounded-2xl bg-primary-100/70 border border-primary-300 flex items-center justify-center transition-colors duration-200 hover:bg-white hover:border-primary-100 group-hover:bg-white group-hover:border-primary-100 " +
-              frameWidthClassName +
-              " " +
-              frameHeightClassName
-            }
-          >
-            <div className="text-5xl md:text-6xl leading-none select-none" aria-hidden>
-              {illustration}
-            </div>
-          </div>
-
-          <div
-            className={
-              "rounded-full px-8 md:px-10 py-3 md:py-3.5 text-center w-fit " + pillClassName
-            }
-          >
-            <div className="text-base md:text-lg font-extrabold leading-snug whitespace-pre-line">
-              {label}
-            </div>
-          </div>
-        </div>
-      </div>
-    </Link>
-  );
-}
+const tiles = [
+  { to: '/start?next=food-diary', icon: '📋', title: 'บันทึกการกิน', detail: 'บันทึกอาหารประจำวัน', color: '#fff7ed' },
+  { to: '/knowledge', icon: '📖', title: 'ความรู้อาหาร', detail: 'เรียนรู้เรื่องโภชนาการ', color: '#ecfeff' },
+  { to: '/start?next=satisfaction', icon: '⭐', title: 'ความพึงพอใจ', detail: 'ประเมินความพึงพอใจ', color: '#fff1f2' },
+  { to: '/facilities', icon: '🏥', title: 'สถานบริการ', detail: 'ศูนย์บริการสาธารณสุข', color: '#f5f3ff' },
+];
 
 export default function HomePage() {
-  return (
-    <div className="min-h-screen bg-primary-50">
-      <div className="container mx-auto px-4 py-10 md:py-14">
-        <div className="max-w-6xl mx-auto">
-          <div className="relative rounded-[44px] bg-white/55 border border-primary-100 p-7 md:p-12 overflow-hidden">
-            <div
-              className="pointer-events-none absolute right-8 top-8 h-28 w-48 md:h-32 md:w-56 text-primary-200 opacity-60"
-              style={{
-                backgroundImage: "radial-gradient(currentColor 2px, transparent 2px)",
-                backgroundSize: "14px 14px",
-              }}
-            />
-            <div
-              className="pointer-events-none absolute left-10 bottom-10 h-28 w-48 md:h-32 md:w-56 text-primary-200 opacity-55"
-              style={{
-                backgroundImage: "radial-gradient(currentColor 2px, transparent 2px)",
-                backgroundSize: "14px 14px",
-              }}
-            />
-
-            <div className="relative grid gap-8 lg:grid-cols-3 lg:grid-rows-2">
-              {/* Banner: row 1, spans col 1-2 */}
-              <Link
-                to="/start"
-                className="group block focus:outline-none lg:col-span-2 lg:row-start-1"
-                aria-label="เริ่มแบบคัดกรองและประเมินภาวะโภชนาการ"
-              >
-                <div className="h-[190px] md:h-[205px] lg:h-[220px]">
-                  <div className="h-full rounded-[32px] bg-primary-100/70 border border-primary-200 shadow-sm px-7 md:px-10 py-6 md:py-7">
-                    <div className="h-full flex flex-col items-center justify-center text-center">
-                      <div className="mb-4 md:mb-5 rounded-2xl bg-primary-100/70 border border-primary-300 w-[230px] md:w-[290px] h-[92px] md:h-[112px] flex items-center justify-center transition-colors duration-200 hover:bg-white hover:border-primary-100 group-hover:bg-white group-hover:border-primary-100">
-                        <div className="text-5xl md:text-6xl leading-none select-none" aria-hidden>
-                          👵👴🍲
-                        </div>
-                      </div>
-
-                      <h1 className="max-w-[34ch] text-primary-800">
-                        <span className="block text-[20px] md:text-[24px] lg:text-[26px] font-extrabold leading-[1.18] tracking-tight">
-                          แบบคัดกรองและประเมินภาวะโภชนาการ
-                        </span>
-                        <span className="mt-1 block text-[18px] md:text-[20px] lg:text-[22px] font-extrabold leading-[1.2] tracking-tight">
-                          ด้วยตนเองสำหรับผู้สูงอายุในชุมชน
-                        </span>
-                      </h1>
-                    </div>
-                  </div>
-                </div>
-              </Link>
-
-              {/* Top-right: row 1 col 3 */}
-              <div className="lg:col-start-3 lg:row-start-1">
-                <HomeTile
-                  to="/start"
-                  ariaLabel="บันทึกการกิน"
-                  label="บันทึกการกิน"
-                  illustration={<span>📋</span>}
-                  pillVariant="outline"
-                />
-              </div>
-
-              {/* Bottom-left: row 2 col 1 */}
-              <div className="lg:col-start-1 lg:row-start-2">
-                <HomeTile
-                  to="/knowledge"
-                  ariaLabel="ความรู้เรื่องอาหาร"
-                  label="ความรู้เรื่องอาหาร"
-                  illustration={<span>📚</span>}
-                />
-              </div>
-
-              {/* Bottom-middle: row 2 col 2 */}
-              <div className="lg:col-start-2 lg:row-start-2">
-                <HomeTile
-                  to="/start"
-                  ariaLabel="ประเมินความพึงพอใจ"
-                  label="ประเมินความพึงพอใจ"
-                  illustration={<span>💻</span>}
-                />
-              </div>
-
-              {/* Bottom-right: row 2 col 3 */}
-              <div className="lg:col-start-3 lg:row-start-2">
-                <HomeTile
-                  to="/facilities"
-                  ariaLabel="ศูนย์บริการสาธารณสุข"
-                  label="ศูนย์บริการสาธารณสุข"
-                  illustration={<span>🏥</span>}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
+  return <div className="sansa-home min-h-screen">
+    <header className="sansa-public-header">
+      <Link to="/" className="flex items-center gap-3 text-2xl font-bold"><span className="sansa-brand-icon text-3xl" aria-hidden>ϟ</span>SANSA</Link>
+      <Link to="/admin/login" className="font-semibold text-primary-700">ผู้ดูแลระบบ</Link>
+    </header>
+    <main className="mx-auto max-w-6xl px-5 pb-12">
+      <section className="text-center py-10 md:py-12">
+        <p className="inline-flex rounded-full bg-primary-50 px-5 py-2 text-sm font-semibold text-primary-700">🩺 ระบบคัดกรองภาวะโภชนาการ</p>
+        <h1 className="mt-7 text-3xl md:text-5xl font-bold leading-relaxed">แบบคัดกรองและประเมิน<br /><span className="text-primary-600">ภาวะโภชนาการ</span></h1>
+        <p className="mt-5 text-lg md:text-xl text-slate-500">ด้วยตนเองสำหรับผู้สูงอายุในชุมชน</p>
+      </section>
+      <section aria-label="ขั้นตอนการประเมิน" className="sansa-panel bg-gradient-to-br from-white to-primary-50 px-4 py-6 text-center">
+        <h2 className="font-semibold text-primary-700 mb-5">ขั้นตอนการประเมิน</h2>
+        <ol className="flex flex-wrap justify-center gap-3 md:gap-6">
+          {['📝|ข้อมูลทั่วไป', '🍽️|SANSA', '📊|MNA', '⚖️|BIA', '⭐|พึงพอใจ', '📋|ผลลัพธ์'].map((step, index) => {
+            const [icon, label] = step.split('|');
+            return <li key={label} className="relative min-w-16 text-sm text-slate-500"><span aria-hidden className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-50 text-2xl">{icon}</span>{label}{index < 5 && <span aria-hidden className="hidden md:block absolute -right-4 top-3 text-primary-300 text-xl">›</span>}</li>;
+          })}
+        </ol>
+      </section>
+      <Link to="/start" className="sansa-banner my-7 flex items-center justify-between gap-4 p-7 md:p-10">
+        <div className="relative"><h2 className="text-2xl md:text-3xl font-bold">เริ่มทำแบบคัดกรอง</h2><p className="mt-3 text-white/90 text-lg">ประเมินภาวะโภชนาการของคุณวันนี้</p></div>
+        <span aria-hidden className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/20 text-3xl">→</span>
+      </Link>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+        {tiles.map(tile => <Link key={tile.title} to={tile.to} className="sansa-panel sansa-tile p-5 md:p-7 text-center">
+          <span aria-hidden style={{ background: tile.color }} className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl text-3xl">{tile.icon}</span>
+          <h2 className="text-lg font-bold">{tile.title}</h2><p className="mt-2 text-sm text-slate-500">{tile.detail}</p>
+        </Link>)}
       </div>
-    </div>
-  );
+    </main>
+  </div>;
 }

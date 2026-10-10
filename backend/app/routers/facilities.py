@@ -37,7 +37,7 @@ def list_facilities(
     """
     query = db.query(Facility).filter(Facility.is_deleted == False)
 
-    if not current_user or not include_inactive:
+    if not current_user or current_user.role not in ("staff", "admin") or not include_inactive:
         query = query.filter(Facility.is_active == True)
 
     return query.order_by(Facility.display_order.asc(), Facility.name.asc()).all()
