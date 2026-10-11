@@ -57,27 +57,43 @@ def compare_sheet(name, source_headers, source_rows, export_headers, export_rows
         for field in source_headers:
             if field in excluded:
                 continue
-            # The source contains one documented out-of-domain value (4 in a
-            # field defined as a 0/1 flag). The exact value remains in the
-            # immutable sheet snapshot; operational normalization cannot turn
-            # it into a boolean without inventing meaning.
-            if name == "Participant_Data" and record_id == 52 and field == "Income_work":
-                if source_by_id[record_id][field] != 4:
-                    mismatches.append((record_id, field))
-                continue
-            # revised4 row 138 stores category 1 although its total 23.5 maps
-            # to category 2 under the workbook's own Data_Dictionary rule.
-            # Keep the source cell in the immutable snapshot and keep the
-            # operational value derived from the approved threshold.
-            if name == "BIA_MNA_Staff" and record_id == 138 and field == "mna_total_cat":
-                if source_by_id[record_id][field] != 1 or export_by_id[record_id][field] != "2":
-                    mismatches.append((record_id, field))
-                continue
             if not equal_value(
                 source_by_id[record_id][field], export_by_id[record_id][field], field
             ):
                 mismatches.append((record_id, field))
     return len(source_headers) - len(excluded), mismatches
+
+
+def validate_source(source):
+    issues = []
+    participant_rows = source["Participant_Data"][1]
+    binary_fields = (
+        "Income_oldage", "Income_Pension", "Income_spouse",
+        "Income_children", "Income_work", "DM", "HT", "DLP",
+        "CKD", "CA", "Other",
+    )
+    for row in participant_rows:
+        for field in binary_fields:
+            if row[field] not in (0, 1):
+                issues.append({
+                    "sheet": "Participant_Data",
+                    "record_id": int(row["record_id"]),
+                    "field": field,
+                    "value": row[field],
+                    "expected_domain": [0, 1],
+                })
+    for row in source["BIA_MNA_Staff"][1]:
+        total = float(row["mna_total"])
+        expected = 1 if total >= 24 else 2 if total >= 17 else 3
+        if int(row["mna_total_cat"]) != expected:
+            issues.append({
+                "sheet": "BIA_MNA_Staff",
+                "record_id": int(row["record_id"]),
+                "field": "mna_total_cat",
+                "value": row["mna_total_cat"],
+                "expected_from_total": expected,
+            })
+    return issues
 
 
 def main():
@@ -89,6 +105,9 @@ def main():
         ids = [row["record_id"] for row in rows]
         if ids != list(range(1, 201)):
             raise RuntimeError(f"{name}: populated rows are not record_id 1..200")
+    source_validation_issues = validate_source(source)
+    if source_validation_issues:
+        raise RuntimeError(f"source validation issues: {source_validation_issues[:20]}")
 
     db = SessionLocal()
     try:
@@ -152,13 +171,7 @@ def main():
             "normalized_counts": counts,
             "compared_columns": compared,
             "source_missing_counts": missing,
-            "source_validation_issues": [
-                {"sheet": "Participant_Data", "record_id": 52,
-                 "field": "Income_work", "value": 4, "expected_domain": [0, 1]},
-                {"sheet": "BIA_MNA_Staff", "record_id": 138,
-                 "field": "mna_total_cat", "value": 1,
-                 "expected_from_total_23_5": 2},
-            ],
+            "source_validation_issues": source_validation_issues,
         })
     finally:
         db.close()

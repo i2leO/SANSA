@@ -180,11 +180,15 @@ export default function AdminResultPage() {
               <tbody className="divide-y">
                 {mnaQuestions.map((question, index) => {
                   const raw = mna.data?.[question.field];
-                  const answer = question.options.find(option => option.value === raw)?.label ?? displayResearchValue(question.field, raw);
                   const scoreField = index < 6 ? `mna_s${index + 1}` : `mna_a${index - 5}`;
+                  const score = show(mna.data, scoreField);
+                  const scoreOnly = mna.data?.answer_capture_mode === 'score_only';
+                  const answer = scoreOnly
+                    ? `ไม่ได้บันทึกคำตอบดิบ (คะแนนต้นทาง ${score})`
+                    : question.options.find(option => option.value === raw)?.label ?? displayResearchValue(question.field, raw);
                   return <Fragment key={question.field}>
                     {(index === 0 || index === 6) && <tr className="bg-emerald-50/60"><td colSpan={4} className="p-4 font-bold text-emerald-800">{index === 0 ? 'ส่วนคัดกรอง A–F' : 'ส่วนประเมิน G–R'}</td></tr>}
-                    <tr><td className="p-4 font-bold">{question.letter}</td><td className="p-4">{question.label}</td><td className="p-4 font-medium">{answer}</td><td className="p-4 text-right font-bold text-emerald-700">{show(mna.data, scoreField)}</td></tr>
+                    <tr><td className="p-4 font-bold">{question.letter}</td><td className="p-4">{question.label}</td><td className="p-4 font-medium">{answer}</td><td className="p-4 text-right font-bold text-emerald-700">{score}</td></tr>
                   </Fragment>;
                 })}
               </tbody>
@@ -194,7 +198,7 @@ export default function AdminResultPage() {
       </OptionalSection>
     </section>
     <section id="history" className="scroll-mt-20 rounded-3xl border border-emerald-100 bg-white p-7 shadow-sm">
-      <h2 className="text-2xl font-bold">ประวัติการบันทึก MNA / BIA</h2>
+      <h2 className="text-2xl font-bold">ประวัติการบันทึก SANSA / MNA / BIA</h2>
       <p className="mt-2 text-slate-600">แต่ละ revision เป็น snapshot ที่เก็บเพิ่มและไม่เขียนทับข้อมูลก่อนหน้า</p>
       {revisions.length===0?<p className="mt-4 rounded-xl bg-slate-50 p-4 text-slate-500">ข้อมูลเดิมยังไม่มี revision; ระบบจะสร้าง baseline เมื่อมีการแก้ครั้งถัดไป</p>:<div className="mt-5 space-y-4">{revisions.map(revision=><details key={revision.id} className="rounded-xl border p-4" open={revision.is_current}><summary className="cursor-pointer font-bold">{revision.instrument} revision {revision.revision_number} · {revision.action_type} {revision.is_current?'· ปัจจุบัน':''}<span className="ml-3 font-normal text-slate-500">{revision.recorded_at}</span></summary><p className="mt-2 text-sm text-slate-600">ผู้บันทึก: {revision.changed_by??'ระบบ/ข้อมูลนำเข้า'}{revision.change_reason?` · เหตุผล: ${revision.change_reason}`:''}</p><div className="mt-3 grid gap-2 sm:grid-cols-2">{Object.entries(revision.snapshot).map(([key,value])=><div key={key} className="border-b py-2"><span className="text-xs text-slate-500">{key}</span><p className="break-all font-mono text-sm">{value==null?'—':typeof value==='object'?JSON.stringify(value):String(value)}</p></div>)}</div></details>)}</div>}
     </section>

@@ -71,7 +71,7 @@ def respondent_timeline(
 @router.get("/visit/{visit_id}/revisions")
 def visit_revisions(
     visit_id: int,
-    instrument: str | None = Query(None, pattern="^(MNA|BIA)$"),
+    instrument: str | None = Query(None, pattern="^(SANSA|MNA|BIA)$"),
     db: Session = Depends(get_db),
     _: User = Depends(get_current_staff_or_admin),
 ):

@@ -1,5 +1,47 @@
 # SANSA: บริบทสำหรับการ Rework
 
+## 2026-10-11 — Production deployment
+
+- Deploy source ปัจจุบันขึ้น `sansa-ntc.org` แล้วผ่าน SSH key โดยไม่บันทึกรหัสผ่านไว้ใน repository; frontend production hotfix ใช้ asset `assets/index-DjbrCzvq.js`
+- สำรองก่อน deploy ที่ `/www/backups/sansa/sansa-predeploy-20261011-231522.sql` และ `/www/backups/sansa/sansa-files-predeploy-20261011-231522.tar.gz`
+- Production migration ขยับจาก `20261008_09` ถึง `20261010_13` ตามลำดับ และ backend restart สำเร็จ; ตรวจ `/health` ทั้ง localhost และ `https://sansa-ntc.org/api/health` ได้ `healthy`
+- ตรวจหน้า `https://sansa-ntc.org/admin/login` หลัง deploy แล้วโหลดสำเร็จ
+- แก้ post-deploy configuration defect: build แรกฝัง `VITE_API_URL=http://192.168.1.37:8000` จาก local `.env` ทำให้ production login ไม่ส่ง request เข้า production API; rebuild ด้วย `VITE_API_URL=/api`, deploy asset ใหม่ และยืนยันผ่าน Chrome ว่า `admin` login ถึง `/admin/dashboard` สำเร็จ
+- รอบนี้เป็น code/schema deployment ไม่ใช่ production cohort replacement: aggregate หลัง deploy ยังคงมี respondents 246, visits 243, SANSA 241, MNA 209 และ BIA 208; ไม่ลบ/นำเข้า/จับคู่ข้อมูลผู้เข้าร่วมโดยไม่มีคำสั่งและ crosswalk ที่ชัดเจน
+- คอลัมน์ provenance ของ MNA ที่เพิ่มใน migration ใช้ server default `web/raw_answers` กับแถว production เดิม; ยังไม่ reclassify แถวเดิมเป็น revised4/score-only เพราะ production identity/source mapping ไม่ได้ยืนยันในรอบ deploy นี้
+
+## 2026-10-11 — Participant list row navigation (local)
+
+- หน้ารายชื่อผู้เข้าร่วมเปิดรายละเอียดได้จากการกดพื้นที่ใดก็ได้ทั้งแถว ไม่ต้องเลื่อนไปกดข้อความ “เปิด” ทางขวา
+- ตาราง “รอบการประเมิน” ในหน้ารายละเอียดผู้เข้าร่วมเปิดหน้าผลได้จากการกดพื้นที่ใดก็ได้ทั้งแถวเช่นกัน ไม่ต้องเลื่อนไปกด “SANSA Result →”
+- แถวยังแสดง “เปิด →” เป็น visual cue และรองรับการโฟกัสด้วยคีย์บอร์ด รวมทั้ง Enter/Space
+- ตรวจใน local แล้วว่าการกดแถว R4-0200 เปิด `/admin/respondents/R4-0200` และการกดแถวรอบ 1 / ID 443 เปิด `/admin/results/443`; frontend build และ lint ผ่าน และ deploy production แล้วในวันเดียวกัน
+
+## 2026-10-11 — Imported MNA current-result flow (ส่วนแรกเสร็จใน local)
+
+สถานะ: **ส่วนแรกดำเนินการและตรวจสอบใน local แล้ว ยังไม่ deploy** ส่วนหลักถัดไปรอผู้ใช้ระบุ/ยืนยันก่อนดำเนินการ
+
+- ข้อมูล revised4 ที่มี `mna_s1..mna_s6`, `mna_a1..mna_a12`, `mna_screen_total`, `mna_ass_total`, `mna_total` และ category ต้องใช้แสดงคะแนน/ผล MNA ปัจจุบันทันที แม้ชุดข้อมูลจะไม่มีคำตอบดิบ A–R
+- `answer_capture_mode=score_only` หมายถึง “ไม่มีคำตอบดิบ” ไม่ใช่ “ยังไม่มีผล MNA” หน้า admin/staff จึงห้ามแสดงสถานะ “รอบันทึก” เมื่อคะแนนและผลจากแหล่งข้อมูลที่ตรวจสอบแล้วมีอยู่ครบ
+- ห้าม reverse-map หรือสร้างคำตอบดิบจากคะแนน แต่สามารถแสดงคะแนนรายข้อ คะแนนรวม category และ provenance ของข้อมูลนำเข้าได้
+- เมื่อ admin/staff บันทึกคำตอบดิบใหม่หรือแก้ไขข้อมูล จึงคำนวณและเปลี่ยน current result จากนิยามที่อนุมัติ พร้อม append revision ของค่าก่อนหน้า ห้ามทำลายผลนำเข้าเดิม
+- ต้องไล่ตรวจ API result selection, เงื่อนไขสถานะในหน้า admin/staff และ export ให้ใช้ความหมายเดียวกัน พร้อม regression cases อย่างน้อย: imported score-only, staff first save, staff re-save/update และ revision history
+- Acceptance: imported MNA แสดงผลได้โดยไม่ต้องบันทึกซ้ำ; หลังเจ้าหน้าที่บันทึก ผลล่าสุดเปลี่ยนถูกต้อง; ผลก่อนแก้ยังดูย้อนหลังได้; ไม่มีคำตอบดิบปลอม และไม่กระทบจำนวน cohort 200 คน
+- Implementation: API ส่ง `current_result` ที่คำนวณจากคะแนนรายข้อปัจจุบัน พร้อม category มาตรฐาน แหล่งข้อมูล และ integrity status โดยไม่ reverse-map คำตอบ A–R; หน้า staff แยก “ผล MNA ปัจจุบัน” ออกจากแบบฟอร์ม “บันทึกคำตอบใหม่หรือแก้ไขผลปัจจุบัน” ชัดเจน
+- เมื่อ staff บันทึกคำตอบ A–R ครบ รายการปัจจุบันเปลี่ยน provenance เป็น `web/raw_answers`, คำนวณผลใหม่ และเก็บ imported `score_only` state เดิมเป็น baseline/revision ก่อน update
+- Verification: backend tests 145 passed, frontend build/lint passed และ browser ตรวจ Visit 443 พบผลนำเข้าแสดง `8/14`, `11/16`, `19/30`, category “กลุ่มเสี่ยงต่อภาวะขาดสารอาหาร” โดยฟอร์มว่างไม่ทำให้ผลเดิมหายหรือแสดงเป็น “รอบันทึก”
+
+## 2026-10-10 — EDIT alignment, workbook coverage and MNA answer provenance
+
+- The approved SANSA 0/2/4 definition now uses the complete question wording and score bands transcribed from `EDIT SANSA ONLINE (revised).pdf` pages 5–9. Q14 correctly has no 0-point option; “แทบไม่ได้ดื่ม / 1 แก้ว” scores 2 and 2/3/>3 glasses score 4.
+- Participant results now expose D2/D3 item feedback from the same visit and the participant waist input preserves the original value/unit together with the normalized centimetre value. Migration `20261010_12` adds this waist provenance.
+- A fresh fail-fast revised4 audit passed after the changes: all six workbook sheets are snapshotted; the normalized cohort remains exactly 200 respondents and 200 rows in visits, SANSA, prediction, BIA, MNA and satisfaction; the four operational sheets compare across 45, 16, 42 and 12 source-authored columns respectively.
+- Source-empty fields remain empty rather than invented: assessment ID/date (all operational sheets), staff ID, satisfaction respondent role/mean/level, and optional comments/text where absent.
+- Customer-confirmed source corrections were applied to revised4 on 10 Oct: `Participant_Data` record 52 `Income_work` changed from 4 to 1, and `BIA_MNA_Staff` record 138 `mna_total_cat` changed from 1 to 2 (กลุ่มเสี่ยงต่อภาวะขาดสารอาหาร for total 23.5). The original workbook remains in the local backup and the previous immutable import batch remains in database provenance; the corrected workbook hash is `4e8de61ae938de177c9eeae5ca3fb4ee0ea7d36ea6facd0b04627ec677c405b5`. Formula text, cached formula results, workbook structure and styles were verified unchanged outside these two cells.
+- revised4 contains MNA item scores but not A–R raw option codes. Migration `20261010_13` adds `source_dataset` and `answer_capture_mode` to MNA. The local 200-row cohort is marked `score_only`, current raw-answer claims are cleared, and prior states remain in append-only revisions. Admin display now says that the raw answer was not recorded and shows only the source score. New staff-entered MNA records remain `raw_answers` and are scored from the approved form definition.
+- SANSA create/update now also produces append-only revisions, hard delete is blocked, and the history API/UI covers SANSA together with MNA and BIA.
+- Verification completed locally after the customer corrections: 143 backend tests, revised4 six-sheet/database/export audit with no source validation issues, migration to `20261010_13`, and browser inspection of visit 443. The previously completed frontend production build and lint remain valid because this correction did not change frontend source. No VPS deployment was performed.
+
 ## 2026-10-09 — Local MNA save feedback and per-item result display
 
 - revised4 MNA rows contain recorded scores but not raw A–R option values. The staff form therefore must not reverse-map scores into invented answers; the stored historical score remains visible until staff completes and saves all 18 answers.
@@ -370,6 +412,6 @@ The earlier `Code_Self` implementation decision was superseded on 2026-10-08 by 
 - The local cohort maps exactly from workbook `record_id` 1–200 to respondent codes `R4-0001`–`R4-0200`. Normalized counts are 200 for respondents, visits, SANSA, prediction, BIA, MNA, and satisfaction.
 - Corrected the import mapping for marital values 3/4 to `widowed`/`divorced`. `Other` and `Other_text` are preserved independently because revised4 contains text even when its flag is zero.
 - A field audit passes for 45 Participant, 16 Prediction, 42 BIA/MNA, and 12 source-authored Satisfaction columns. Formula BMI is compared to the two-decimal operational storage while its original formula/value remains in the snapshot.
-- Two source validation exceptions are retained rather than silently coerced: Participant row 52 has `Income_work=4` although the dictionary domain is 0/1; BIA/MNA row 138 has category 1 at total 23.5 although its dictionary rule yields category 2. Operational data follows the approved dictionary, while exact source cells remain auditable.
+- The two previously documented source exceptions were corrected only after explicit customer confirmation: Participant row 52 `Income_work` is now 1, and BIA/MNA row 138 category is now 2 at total 23.5. The audit no longer contains record-specific bypasses; it validates all binary source fields and every MNA total/category pair fail-fast. The pre-correction workbook and import batch remain auditable.
 - Source-empty assessment IDs/dates/staff IDs stay null/blank. No identifier or date was invented. Current record 200 MNA was reconciled to revised4 total 19; the prior value remains in append-only revision history.
 - Verification: 141 isolated backend tests passed, frontend production build passed, six-sheet/database/export audit passed, and the provenance backfill was confirmed idempotent at 604 total assessment revisions. Local backup before the migration: `backups/sansa_rework_local_before_history_20261010_072457.sql`. No VPS deployment was performed.

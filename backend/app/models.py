@@ -499,6 +499,10 @@ class MNAResponse(Base):
     scoring_version_id = Column(
         Integer, ForeignKey("scoring_rule_versions.id"), nullable=False
     )
+    # A score-only import must never be presented as if the participant chose
+    # a specific raw option.  These fields make that provenance explicit.
+    source_dataset = Column(String(50), nullable=False, default="web")
+    answer_capture_mode = Column(String(30), nullable=False, default="raw_answers")
 
     # MNA Questions (Q1-Q18) with answers and scores
     q1_food_intake_decline = Column(String(50))
@@ -574,6 +578,8 @@ class BIARecord(Base):
 
     # Anthropometry
     waist_circumference_cm = Column(DECIMAL(5, 2))
+    waist_input_value = Column(DECIMAL(7, 2), nullable=True)
+    waist_input_unit = Column(String(10), nullable=True)
     weight_kg = Column(DECIMAL(5, 2))
     height_cm = Column(DECIMAL(5, 2))
     bmi = Column(DECIMAL(5, 2))

@@ -10,10 +10,11 @@ from app.auth import get_current_staff_or_admin
 from typing import Optional
 from sqlalchemy.exc import SQLAlchemyError
 from app.schemas import SANSARevisedResult, SANSAParticipantResult
-from app.services.sansa_result_service import revised_visit_result
+from app.services.sansa_result_service import participant_item_results, revised_visit_result
 from app.services.sansa_definition import DB_SCORING_VERSION, DEFINITION_VERSION, SANSA_QUESTIONS
 from app.services.sansa_domain_service import age_group01
 from app.services.sansa_prediction_service import predict_sansa_nutrition_status
+from app.services.assessment_revision_service import append_assessment_revision, ensure_assessment_baseline
 
 router = APIRouter(prefix="/sansa", tags=["sansa"])
 
@@ -102,6 +103,8 @@ def create_sansa_response(
     )
 
     db.add(sansa_response)
+    db.flush()
+    append_assessment_revision(db, "SANSA", sansa_response, action_type="create")
     db.commit()
     db.refresh(sansa_response)
 
@@ -241,6 +244,7 @@ def get_participant_result(visit_id: int, db: Session = Depends(get_db)):
         return {
             "predicted_group": prediction["predicted_group"] if prediction else None,
             "ready": bool(prediction),
+            "item_results": participant_item_results(response),
         }
     except (ValueError, SQLAlchemyError):
         db.rollback()
@@ -297,6 +301,7 @@ def update_sansa_response(
             status_code=409,
             detail="รายการนี้เป็นคะแนนคนละเวอร์ชัน จึงไม่แก้ไขทับประวัติเดิม กรุณาใช้ขั้นตอน rescore แบบแยกเวอร์ชัน",
         )
+    ensure_assessment_baseline(db, "SANSA", sansa_response)
     try:
         scores = scoring_service.calculate_sansa_scores(sansa_update, version_id=version.id)
     except ValueError as e:
@@ -341,6 +346,8 @@ def update_sansa_response(
     sansa_response.total_score = scores["total_score"]
     sansa_response.result_level = scores["result_level"]
 
+    db.flush()
+    append_assessment_revision(db, "SANSA", sansa_response, current_user, "update")
     db.commit()
     db.refresh(sansa_response)
 
@@ -353,7 +360,7 @@ def delete_sansa_response(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_staff_or_admin),
 ):
-    """Delete SANSA response (staff/admin only)"""
+    """Research responses are corrected by revision and never hard-deleted."""
     sansa_response = (
         db.query(SANSAResponse).filter(SANSAResponse.id == sansa_response_id).first()
     )
@@ -361,10 +368,10 @@ def delete_sansa_response(
     if not sansa_response:
         raise HTTPException(status_code=404, detail="SANSA response not found")
 
-    db.delete(sansa_response)
-    db.commit()
-
-    return {"message": "SANSA response deleted successfully"}
+    raise HTTPException(
+        status_code=409,
+        detail="ข้อมูลวิจัย SANSA ห้ามลบ กรุณาบันทึกการแก้ไขเป็น revision ใหม่",
+    )
 
 
 @router.get("/{sansa_response_id}/advice")

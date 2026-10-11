@@ -146,10 +146,14 @@ def save_participant_waist(
         record = records[0]
         ensure_assessment_baseline(db, "BIA", record)
         record.waist_circumference_cm = payload.waist_circumference_cm
+        record.waist_input_value = payload.waist_input_value
+        record.waist_input_unit = payload.waist_input_unit
     else:
         record = BIARecord(
             visit_id=visit_id,
             waist_circumference_cm=payload.waist_circumference_cm,
+            waist_input_value=payload.waist_input_value,
+            waist_input_unit=payload.waist_input_unit,
             measurement_date=datetime.utcnow().date(),
             created_at=datetime.utcnow(),
         )

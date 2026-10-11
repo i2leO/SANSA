@@ -80,4 +80,5 @@
 - `respondents.source_record_id` คือรหัส 1–200 จาก Excel; ห้ามใช้ primary key ภายในแทนรหัสต้นทาง
 - `visits.source_assessment_id` และ `bia_records.source_staff_id` คงเป็น null เพราะ workbook ไม่มีค่า ห้ามสร้างค่าทดแทน
 - ข้อมูล normalized ใช้สำหรับระบบปัจจุบัน ส่วน snapshot และ `assessment_revisions` ใช้ตรวจสอบต้นทาง/ประวัติย้อนหลัง โดยแยก null ออกจากเลขศูนย์
-- `scripts/audit_revised4_import.py` เป็น fail-fast audit สำหรับ coverage, counts, snapshots และ field-level export fidelity; ข้อยกเว้นที่พบในต้นทางต้องระบุอย่างชัดเจนในผล audit ไม่ใช่แก้เงียบ
+- `scripts/audit_revised4_import.py` เป็น fail-fast audit สำหรับ coverage, counts, snapshots และ field-level export fidelity รวมทั้งตรวจ binary domain และความสัมพันธ์ MNA total/category ทุก record โดยไม่มี record-specific bypass
+- วันที่ 10 ต.ค. ลูกค้ายืนยันแก้ revised4 สองจุด: record 52 `Income_work` จาก 4 เป็น 1 และ record 138 `mna_total_cat` จาก 1 เป็น 2; เก็บ workbook/import batch ก่อนแก้ไว้สำหรับ audit และสร้าง provenance batch ใหม่จากไฟล์ที่แก้แล้ว

@@ -369,14 +369,26 @@ class SANSARevisedResult(BaseModel):
 
 
 class SANSAParticipantResult(BaseModel):
-    """Minimum prediction contract exposed to participant sessions."""
+    """Participant-safe result for one visit, including approved item feedback."""
 
     predicted_group: Optional[str] = None
     ready: bool
+    item_results: List[dict] = Field(default_factory=list)
 
 
 class ParticipantWaistUpdate(BaseModel):
-    waist_circumference_cm: Decimal = Field(..., gt=0, le=300)
+    waist_input_value: Decimal = Field(..., gt=0)
+    waist_input_unit: str
+    waist_circumference_cm: Decimal = Field(..., ge=40, le=200)
+
+    @model_validator(mode="after")
+    def validate_unit_conversion(self):
+        if self.waist_input_unit not in {"cm", "inch"}:
+            raise ValueError("หน่วยเส้นรอบเอวต้องเป็น cm หรือ inch")
+        expected = self.waist_input_value if self.waist_input_unit == "cm" else self.waist_input_value * Decimal("2.54")
+        if abs(expected - self.waist_circumference_cm) > Decimal("0.05"):
+            raise ValueError("ค่าเส้นรอบเอวหลังแปลงหน่วยไม่ตรงกัน")
+        return self
 
 
 class SANSAResponseFull(BaseModel):
@@ -623,8 +635,26 @@ class MNAResponseUpdate(BaseModel):
     )
 
 
+class MNAResultSummary(BaseModel):
+    available: bool = False
+    source: str
+    has_raw_answers: bool = False
+    has_item_scores: bool = False
+    screening_total: Optional[Decimal] = None
+    assessment_total: Optional[Decimal] = None
+    total: Optional[Decimal] = None
+    category: Optional[str] = None
+    category_code: Optional[str] = None
+    category_label: Optional[str] = None
+    integrity_status: str
+    issues: List[str] = Field(default_factory=list)
+
+
 class MNAResponseFull(BaseModel):
     history_requires_review: bool = False
+    source_dataset: str = "web"
+    answer_capture_mode: str = "raw_answers"
+    current_result: Optional[MNAResultSummary] = None
     q19_calf_circumference_assess: Optional[str] = None
     mna_a12: Optional[Decimal] = None
     mac_cm: Optional[Decimal] = None

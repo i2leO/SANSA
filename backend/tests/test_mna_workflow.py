@@ -9,6 +9,7 @@ from app.database import Base
 from app.models import AssessmentRevision, MNAResponse, ScoringRuleVersion
 from app.routers.mna import router
 from app.services.export_service import ExportService
+from app.services.mna_definition import MNA_ITEMS
 from tests.test_sansa_result_integration import fixture
 
 
@@ -31,6 +32,9 @@ def test_definition_create_reject_incomplete_and_update_same_record():
             assert response.status_code == 200
             identity = response.json()['id']
             assert float(response.json()['mna_total']) == 30
+            assert response.json()['current_result']['available'] is True
+            assert response.json()['current_result']['source'] == 'recorded_answers'
+            assert response.json()['current_result']['category_label'] == 'ภาวะโภชนาการปกติ'
             assert response.json()['q19_calf_circumference_assess'] == '>=31'
             assert float(response.json()['mna_a12']) == 1
             assert response.json()['mna_s7'] is None
@@ -82,6 +86,58 @@ def test_definition_create_reject_incomplete_and_update_same_record():
             db.expire_all()
             assert db.query(MNAResponse).one().q1_food_intake_decline == 'moderate'
             assert original_version != wrong_version.id
+    finally:
+        db.close()
+        engine.dispose()
+
+
+def test_imported_score_only_result_displays_before_staff_replacement():
+    engine, db, app, visit, _, _ = fixture()
+    Base.metadata.create_all(engine, tables=[Base.metadata.tables["mna_responses"]])
+    db.add(ScoringRuleVersion(instrument_name='MNA', version_number='test', is_active=True))
+    db.commit()
+    app.include_router(router, dependencies=[Depends(get_current_staff_or_admin)])
+    try:
+        with TestClient(app) as client:
+            items = client.get('/mna/definition').json()['items']
+            payload = {item['field']: max(item['options'], key=lambda option: float(option['score']))['value'] for item in items}
+            created = client.post('/mna', json={'visit_id': visit.id, **payload})
+            assert created.status_code == 200
+            identity = created.json()['id']
+
+            # Reproduce a revised4 row: item scores/totals exist, raw options do not.
+            db.query(AssessmentRevision).delete()
+            record = db.query(MNAResponse).filter_by(id=identity).one()
+            for item in MNA_ITEMS:
+                setattr(record, item['field'], None)
+            record.source_dataset = 'revised4'
+            record.answer_capture_mode = 'score_only'
+            record.result_category = '1'
+            db.commit()
+
+            imported = client.get(f'/mna/visit/{visit.id}')
+            assert imported.status_code == 200
+            body = imported.json()
+            assert body['q1_food_intake_decline'] is None
+            assert body['current_result']['available'] is True
+            assert body['current_result']['source'] == 'imported_scores'
+            assert body['current_result']['has_raw_answers'] is False
+            assert float(body['current_result']['total']) == 30
+            assert body['current_result']['category_label'] == 'ภาวะโภชนาการปกติ'
+
+            replaced = client.put(f'/mna/{identity}', json=payload)
+            assert replaced.status_code == 200
+            replaced_body = replaced.json()
+            assert replaced_body['source_dataset'] == 'web'
+            assert replaced_body['answer_capture_mode'] == 'raw_answers'
+            assert replaced_body['current_result']['source'] == 'recorded_answers'
+            assert replaced_body['current_result']['has_raw_answers'] is True
+            revisions = db.query(AssessmentRevision).filter_by(
+                instrument='MNA', record_id=identity
+            ).order_by(AssessmentRevision.revision_number).all()
+            assert [revision.action_type for revision in revisions] == ['baseline', 'update']
+            assert revisions[0].snapshot['answer_capture_mode'] == 'score_only'
+            assert revisions[1].snapshot['answer_capture_mode'] == 'raw_answers'
     finally:
         db.close()
         engine.dispose()

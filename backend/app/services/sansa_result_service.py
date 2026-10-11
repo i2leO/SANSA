@@ -9,6 +9,56 @@ from app.services.sansa_prediction_storage import save_sansa_prediction
 from app.services.bia_reference_service import derive_nutrition_reference
 
 
+_ITEM_FEEDBACK = {
+    8: {0: ("UNDER", "กินข้าว-แป้งน้อยกว่าที่แนะนำ ลองเพิ่มข้าวอีกสักทัพพีในมื้อถัดไปนะคะ"), 2: ("NORMAL", "กินข้าว-แป้งพอดีตามเกณฑ์แล้วค่ะ รักษาแบบนี้ไว้นะคะ"), 4: ("OVER", "กินข้าว-แป้งมากกว่าที่แนะนำค่อนข้างมาก ลองลดลงเล็กน้อยในแต่ละมื้อนะคะ")},
+    9: {0: ("UNDER", "กินเนื้อสัตว์หรือไข่น้อยกว่าที่แนะนำ ลองเพิ่มไข่หรือเนื้อสัตว์ไม่ติดมันในมื้อถัดไปนะคะ"), 2: ("NORMAL", "กินเนื้อสัตว์หรือไข่พอดีตามเกณฑ์แล้วค่ะ"), 4: ("OVER", "กินเนื้อสัตว์มากกว่าที่แนะนำ ลองลดปริมาณและเลือกเนื้อไม่ติดมันนะคะ")},
+    10: {0: ("UNDER", "ดื่มนมน้อยกว่าที่แนะนำ ลองเพิ่มเป็นวันละ 1 แก้วนะคะ"), 2: ("NORMAL", "ดื่มนมพอดีตามเกณฑ์แล้วค่ะ"), 4: ("OVER", "ดื่มนมมากกว่าที่แนะนำ อาจได้รับพลังงานและไขมันมากเกินไป ลองลดลงเหลือวันละ 1–2 แก้วนะคะ")},
+    11: {0: ("UNDER", "กินผลไม้น้อยกว่าที่แนะนำ ลองเพิ่มผลไม้เป็นของว่างนะคะ"), 2: ("NORMAL", "กินผลไม้พอดีตามเกณฑ์แล้วค่ะ"), 4: ("OVER", "กินผลไม้มากกว่าที่แนะนำ อาจได้รับน้ำตาลมากเกินไป โดยเฉพาะเมื่อมีภาวะเบาหวานร่วมด้วย ลองลดลงนะคะ")},
+    12: {0: ("UNDER", "กินผักน้อยกว่าที่แนะนำ ลองเพิ่มผักในทุกมื้อนะคะ"), 2: ("NORMAL", "กินผักพอดีหรือมากกว่าเกณฑ์แล้ว ดีมากค่ะ")},
+    13: {0: ("UNDER", "ดื่มน้ำน้อยกว่าที่แนะนำ ลองดื่มน้ำเปล่าเพิ่มขึ้นระหว่างวันนะคะ"), 2: ("NORMAL", "ดื่มน้ำเพียงพอตามเกณฑ์แล้วค่ะ")},
+    14: {2: ("NORMAL", "ดื่มเครื่องดื่มหวานไม่บ่อย ดีแล้วค่ะ"), 4: ("OVER", "ดื่มเครื่องดื่มหวานบ่อยไป ลองลดลงนะคะ")},
+    15: {2: ("NORMAL", "กินของทอดไม่บ่อย ดีแล้วค่ะ"), 4: ("OVER", "กินของทอดบ่อยไป ลองลดลงนะคะ")},
+    16: {0: ("UNDER", "ใช้น้ำมันหรือกะทิน้อยเกินไปก็ไม่ดี ลองปรับให้พอดีนะคะ"), 2: ("NORMAL", "ใช้น้ำมันหรือกะทิพอดีแล้วค่ะ"), 4: ("OVER", "ใช้น้ำมันหรือกะทิมากไป ลองลดลงนะคะ")},
+}
+
+
+def participant_item_results(response):
+    """Map D2/D3 answers to the approved page 12–14 participant messages."""
+    items = []
+    for question in SANSA_QUESTIONS:
+        number = question["number"]
+        if number not in _ITEM_FEEDBACK:
+            continue
+        raw = getattr(response, question["field"], None)
+        score_value = getattr(response, f"q{number}_score", None)
+        if score_value is None:
+            continue
+        score = int(Decimal(str(score_value)))
+        feedback = _ITEM_FEEDBACK[number].get(score)
+        if feedback is None:
+            continue
+        selected = next((option for option in question["options"] if option["value"] == raw), None)
+        if selected is not None:
+            answer_label = selected["label"]
+            answer_source = "recorded_answer"
+        else:
+            labels = [option["label"] for option in question["options"] if option["score"] == score]
+            answer_label = " / ".join(dict.fromkeys(labels))
+            answer_source = "score_bucket"
+        items.append({
+            "number": number,
+            "domain": question["domain"],
+            "field": question["field"],
+            "label": question["label"],
+            "answer_label": answer_label,
+            "answer_source": answer_source,
+            "score": score,
+            "status": feedback[0],
+            "recommendation": feedback[1],
+        })
+    return items
+
+
 def revised_visit_result(db, response, persist=False):
     result = {"domain_scores": None, "prediction": None, "reference": None,
               "comparison": None, "bia_record_id": None, "issues": [], "saved": False,

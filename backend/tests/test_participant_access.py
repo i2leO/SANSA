@@ -80,17 +80,27 @@ class ParticipantAccessTests(unittest.TestCase):
             f'/sansa/visit/{self.visit.id}/participant-result', headers=headers
         )
         self.assertEqual(participant_result.status_code, 200)
-        self.assertEqual(set(participant_result.json()), {'predicted_group', 'ready'})
+        self.assertEqual(set(participant_result.json()), {'predicted_group', 'ready', 'item_results'})
+        self.assertEqual([item['number'] for item in participant_result.json()['item_results']], list(range(8, 17)))
         self.assertEqual(self.client.get(f'/bia/visit/{self.visit.id}',headers=headers).status_code,403)
         self.assertEqual(self.client.get(f'/mna/visit/{self.visit.id}',headers=headers).status_code,403)
         waist = self.client.put(
             f'/bia/visit/{self.visit.id}/waist',
-            json={'waist_circumference_cm': 91.5},
+            json={'waist_input_value': 91.5, 'waist_input_unit': 'cm', 'waist_circumference_cm': 91.5},
             headers=headers,
         )
         self.assertEqual(waist.status_code, 200)
         self.db.refresh(self.bia)
         self.assertEqual(float(self.bia.waist_circumference_cm), 91.5)
+        inch = self.client.put(
+            f'/bia/visit/{self.visit.id}/waist',
+            json={'waist_input_value': 36, 'waist_input_unit': 'inch', 'waist_circumference_cm': 91.44},
+            headers=headers,
+        )
+        self.assertEqual(inch.status_code, 200)
+        self.db.refresh(self.bia)
+        self.assertEqual(float(self.bia.waist_circumference_cm), 91.44)
+        self.assertEqual(self.bia.waist_input_unit, 'inch')
         for path,body in [('/visits',{'respondent_id':self.other.id}),('/sansa',{'visit_id':self.other_visit.id}),('/respondents',{}),('/respondents/check-code',{'code':self.other.respondent_code})]:
             self.assertEqual(self.client.post(path,json=body,headers=headers).status_code,403)
     def test_issuer_auth_and_deleted_owner(self):

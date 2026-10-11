@@ -27,6 +27,9 @@ export default function AdminRespondentsPage() {
   const [size,setSize]=useState(10);
   const [total,setTotal]=useState(0);
   const [creating,setCreating]=useState(false);
+  const openRespondent = (respondentCode: string) => {
+    navigate(`/admin/respondents/${respondentCode}`);
+  };
   const createRespondent=async()=>{setCreating(true);try {const {data}=await apiClient.post<Respondent>('/respondents',{});navigate(`/admin/respondents/${data.respondent_code}`);}catch {setError('สร้างผู้เข้าร่วมไม่สำเร็จ');}finally {setCreating(false);}};
 
   useEffect(() => {
@@ -74,18 +77,28 @@ export default function AdminRespondentsPage() {
               </thead>
               <tbody>
                 {respondents.map((r) => (
-                  <tr key={r.id} className="border-t hover:bg-primary-50/50">
+                  <tr
+                    key={r.id}
+                    role="link"
+                    tabIndex={0}
+                    aria-label={`เปิดรายละเอียดผู้เข้าร่วม ${r.respondent_code}`}
+                    onClick={() => openRespondent(r.respondent_code)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        openRespondent(r.respondent_code);
+                      }
+                    }}
+                    className="group cursor-pointer border-t transition-colors hover:bg-primary-50/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500"
+                  >
                     <td className="px-4 py-3 font-mono font-semibold">{r.respondent_code}</td>
                     <td className="px-4 py-3">{r.age ?? "-"}</td>
                     <td className="px-4 py-3">{r.sex ?? "-"}</td>
                     <td className="px-4 py-3 text-gray-600">{r.email || r.phone || "-"}</td>
                     <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => navigate(`/admin/respondents/${r.respondent_code}`)}
-                        className="text-primary-600 hover:text-primary-700 font-medium"
-                      >
+                      <span className="inline-flex font-medium text-primary-600 transition-transform group-hover:translate-x-0.5 group-hover:text-primary-700">
                         เปิด →
-                      </button>
+                      </span>
                     </td>
                   </tr>
                 ))}

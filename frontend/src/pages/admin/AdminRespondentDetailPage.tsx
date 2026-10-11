@@ -295,7 +295,20 @@ export default function AdminRespondentDetailPage() {
                       };
 
                       return (
-                        <tr key={v.id} className="border-t">
+                        <tr
+                          key={v.id}
+                          role="link"
+                          tabIndex={0}
+                          aria-label={`เปิดผลการประเมินรอบ ${v.visit_number} ID ${v.id}`}
+                          onClick={() => navigate(`/admin/results/${v.id}`)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault();
+                              navigate(`/admin/results/${v.id}`);
+                            }
+                          }}
+                          className="group cursor-pointer border-t transition-colors hover:bg-primary-50/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500"
+                        >
                           <td className="px-4 py-3"><b>รอบ {v.visit_number}</b><span className="block font-mono text-xs text-slate-500">ID {v.id}</span></td>
                           <td className="px-4 py-3">{v.visit_date}</td>
                           <td className="px-4 py-3">
@@ -314,12 +327,9 @@ export default function AdminRespondentDetailPage() {
                             </span>
                           </td>
                           <td className="px-4 py-3 text-right">
-                            <button
-                              onClick={() => navigate(`/admin/results/${v.id}`)}
-                              className="text-primary-600 hover:text-primary-700 font-medium"
-                            >
+                            <span className="inline-flex font-medium text-primary-600 transition-transform group-hover:translate-x-0.5 group-hover:text-primary-700">
                               SANSA Result →
-                            </button>
+                            </span>
                           </td>
                         </tr>
                       );

@@ -114,7 +114,11 @@ export default function SANSAFormPage() {
   };
 
   const screening = definition?.questions.filter((question) => question.domain === "screening") ?? [];
-  const dietary = definition?.questions.filter((question) => question.domain !== "screening") ?? [];
+  const sections = [
+    { domain: "d1", title: "ส่วนที่ 2: พฤติกรรมการกินทั่วไป (D1)", note: "เก็บเพื่อวิเคราะห์และรายงาน ไม่ใช้ใน Model 3" },
+    { domain: "d2", title: "ส่วนที่ 3: พฤติกรรมการกินตามธงโภชนาการ (D2)", note: "ใช้เป็นตัวแปรใน Model 3" },
+    { domain: "d3", title: "ส่วนที่ 4: พฤติกรรมหวานและมัน (D3)", note: "ใช้เป็นตัวแปรใน Model 3" },
+  ] as const;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-teal-100 py-8">
@@ -135,10 +139,11 @@ export default function SANSAFormPage() {
             <h2 className="text-2xl font-bold text-green-700 mb-6 pb-3 border-b-2 border-green-200">ส่วนที่ 1: คัดกรอง (Screening)</h2>
             {screening.map((question) => <Question key={question.field} question={question} register={register} />)}
           </div>
-          <div className="bg-white rounded-2xl shadow-xl p-8">
-            <h2 className="text-2xl font-bold text-green-700 mb-6 pb-3 border-b-2 border-green-200">ส่วนที่ 2: พฤติกรรมการบริโภคอาหาร (Dietary Behavior)</h2>
-            {dietary.map((question) => <Question key={question.field} question={question} register={register} />)}
-          </div>
+          {sections.map(section => <div key={section.domain} className="bg-white rounded-2xl shadow-xl p-8">
+            <h2 className="text-2xl font-bold text-green-700">{section.title}</h2>
+            <p className="mb-6 mt-2 border-b-2 border-green-200 pb-3 text-slate-600">{section.note}</p>
+            {definition.questions.filter(question => question.domain === section.domain).map(question => <Question key={question.field} question={question} register={register} />)}
+          </div>)}
           <div className="bg-white rounded-2xl shadow-xl p-6"><div className="flex gap-4">
             <button type="button" onClick={() => navigate(-1)} className="flex-1 py-4 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 font-bold text-lg">← ย้อนกลับ</button>
             <button type="submit" disabled={saving} className="flex-1 py-4 bg-gradient-to-r from-green-600 to-teal-600 text-white rounded-xl hover:from-green-700 hover:to-teal-700 disabled:from-gray-400 disabled:to-gray-400 font-bold text-lg shadow-lg">{saving ? "กำลังบันทึก..." : "ดำเนินการต่อ →"}</button>

@@ -5,10 +5,12 @@ from typing import Optional
 from app.database import get_db
 from app.models import BIARecord, MNAResponse, Visit, User
 from app.services.mna_definition import MNA_ITEMS, answers_from_bia
+from app.services.mna_result_service import build_mna_result_summary
 from app.schemas import (
     MNAResponseCreate,
     MNAResponseUpdate,
     MNAResponseFull,
+    MNAResultSummary,
     MessageResponse,
 )
 from app.services.scoring_service import ScoringService
@@ -21,6 +23,7 @@ router = APIRouter(prefix="/mna", tags=["mna"])
 def present_mna(record):
     payload = MNAResponseFull.model_validate(record)
     payload.history_requires_review = record.scoring_version is None or record.scoring_version.instrument_name != "MNA"
+    payload.current_result = MNAResultSummary(**build_mna_result_summary(record))
     return payload
 
 
@@ -84,6 +87,8 @@ def create_mna_response(
     mna_response = MNAResponse(
         visit_id=mna_create.visit_id,
         scoring_version_id=version.id,
+        source_dataset="web",
+        answer_capture_mode="raw_answers",
         # Screening A-F; preserve the separate historical screening calf slot.
         q1_food_intake_decline=mna_create.q1_food_intake_decline,
         mna_s1=scores.get("mna_s1"),
@@ -222,6 +227,10 @@ def update_mna_response(
     mna_response.mna_ass_total = scores.get("mna_ass_total", 0)
     mna_response.mna_total = scores["mna_total"]
     mna_response.result_category = scores["result_category"]
+    mna_response.source_dataset = "web"
+    mna_response.answer_capture_mode = "raw_answers"
+    mna_response.entry_mode = "staff"
+    mna_response.completed_at = datetime.utcnow()
 
     db.flush()
     append_assessment_revision(db, "MNA", mna_response, current_user, "update")

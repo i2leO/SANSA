@@ -10,6 +10,7 @@ from openpyxl import load_workbook
 from app.database import SessionLocal
 from app.models import BIARecord, MNAResponse, Respondent, SourceImportBatch, SourceImportSheet, Visit
 from app.services.assessment_revision_service import append_assessment_revision
+from app.services.mna_definition import MNA_ITEMS
 from app.services.source_provenance_service import (
     REVISED4_DATASET,
     REVISED4_SCHEMA_VERSION,
@@ -78,7 +79,7 @@ def main():
             respondent.source_dataset = REVISED4_DATASET
             respondent.source_record_id = source_id
             respondent.source_import_batch_id = batch.id
-            # Preserve source inconsistency exactly; do not derive Other from text.
+            # Preserve source semantics exactly; do not derive Other from text.
             source = participant_rows[source_id]
             respondent.age = source["age"]
             respondent.sex = sex_map[source["sex"]]
@@ -107,13 +108,24 @@ def main():
             bia = db.query(BIARecord).filter_by(visit_id=visit.id).one()
             bia.source_staff_id = None
             mna = db.query(MNAResponse).filter_by(visit_id=visit.id).one()
+            changed = (
+                mna.source_dataset != REVISED4_DATASET
+                or mna.answer_capture_mode != "score_only"
+            )
+            mna.source_dataset = REVISED4_DATASET
+            mna.answer_capture_mode = "score_only"
+            for item in MNA_ITEMS:
+                # revised4 contains MNA scores, not A-R raw option codes.
+                # Clear operational claims only; prior values remain in revisions.
+                if getattr(mna, item["field"]) is not None:
+                    changed = True
+                setattr(mna, item["field"], None)
             staff = staff_rows[source_id]
             mna_fields = [f"mna_s{i}" for i in range(1, 7)] + [
                 "mna_screen_total"
             ] + [f"mna_a{i}" for i in range(1, 13)] + [
                 "mna_ass_total", "mna_total"
             ]
-            changed = False
             for field in mna_fields:
                 source_value = None if staff[field] is None else Decimal(str(staff[field]))
                 if getattr(mna, field) != source_value:

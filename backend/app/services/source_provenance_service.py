@@ -45,15 +45,21 @@ def workbook_manifest(path: Path) -> dict:
         headers = [cell.value for cell in next(sheet.iter_rows(min_row=1, max_row=1))]
         formula_cells = 0
         nonempty_cells = 0
-        for row in sheet.iter_rows():
+        row_count = 0
+        column_count = 0
+        for row_count, row in enumerate(sheet.iter_rows(), start=1):
+            column_count = max(column_count, len(row))
             for cell in row:
                 if cell.value not in (None, ""):
                     nonempty_cells += 1
                 if isinstance(cell.value, str) and cell.value.startswith("="):
                     formula_cells += 1
         manifest[sheet_name] = {
-            "rows": sheet.max_row,
-            "columns": sheet.max_column,
+            # Some valid XLSX writers omit worksheet dimension metadata, so
+            # read-only openpyxl exposes max_row/max_column as None. Count the
+            # streamed cells instead of trusting optional metadata.
+            "rows": row_count,
+            "columns": column_count,
             "headers": headers,
             "formula_cells": formula_cells,
             "nonempty_cells": nonempty_cells,
@@ -92,8 +98,8 @@ def workbook_sheet_snapshots(path: Path) -> list[dict]:
         snapshots.append({
             "sheet_name": sheet_name,
             "sheet_role": SHEET_ROLES[sheet_name],
-            "row_count": values_sheet.max_row,
-            "column_count": values_sheet.max_column,
+            "row_count": len(values),
+            "column_count": max((len(row) for row in values), default=0),
             "content_sha256": sha256(canonical.encode("utf-8")).hexdigest(),
             "values_json": values,
             "formulas_json": formulas,

@@ -111,7 +111,12 @@ def main():
             db.add(sansa)
             bia = BIARecord(visit_id=visit.id, age=p["age"], sex=sex_map[p["sex"]], waist_circumference_cm=dec(p["wc_cm"]), height_cm=dec(b["height_cm"]), weight_kg=dec(b["weight_kg"]), bmi=dec(b["bmi"]), fat_mass_kg=dec(b["fat_mass_kg"]), body_fat_percentage=dec(b["pbf"]), visceral_fat_level=dec(b["vfat_level"]), muscle_mass_kg=dec(b["muscle_mass_kg"]), bone_mass_kg=dec(b["bone_mass_kg"]), water_percentage=dec(b["tbw"]), metabolic_rate=b["bmr_kcal"], mac_cm=dec(b["MAC"]), cc_cm=dec(b["CC"]), source_staff_id=b["staff_id"], measurement_date=b["assessment_date"])
             db.add(bia); db.flush()
-            mna = MNAResponse(visit_id=visit.id, scoring_version_id=mna_version.id, entry_mode="staff", mna_screen_total=dec(b["mna_screen_total"]), mna_ass_total=dec(b["mna_ass_total"]), mna_total=dec(b["mna_total"]), result_category=b["mna_total_cat"], mac_cm=dec(b["MAC"]), cc_cm=dec(b["CC"]), **{key:dec(b[key]) for key in mna_scores})
+            mna = MNAResponse(visit_id=visit.id, scoring_version_id=mna_version.id,
+                source_dataset=SOURCE, answer_capture_mode="score_only", entry_mode="staff",
+                mna_screen_total=dec(b["mna_screen_total"]), mna_ass_total=dec(b["mna_ass_total"]),
+                mna_total=dec(b["mna_total"]), result_category=b["mna_total_cat"],
+                mac_cm=dec(b["MAC"]), cc_cm=dec(b["CC"]),
+                **{key:dec(b[key]) for key in mna_scores})
             db.add(mna)
             db.flush()
             append_assessment_revision(db, "BIA", bia, action_type="import")

@@ -9,10 +9,11 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 from app.database import Base, get_db
-from app.models import Respondent, Visit, SANSAResponse, BIARecord, ScoringRuleVersion, SANSAPredictionResult
+from app.models import AssessmentRevision, Respondent, Visit, SANSAResponse, BIARecord, ScoringRuleVersion, SANSAPredictionResult
 from app.routers.sansa import router
 from app.auth import get_current_staff_or_admin
 from app.services.sansa_definition import DB_SCORING_VERSION
+from app.services.sansa_definition import SANSA_QUESTIONS
 from app.services.scoring_service import ScoringService
 
 
@@ -93,6 +94,24 @@ class ResultIntegrationTests(unittest.TestCase):
         self.assertFalse(second.json()["comparison"]["matches"])
         self.assertEqual(self.sansa.total_score, 34)
         self.assertEqual(self.bia.bmi, 22)
+
+    def test_update_appends_sansa_revision_and_delete_is_blocked(self):
+        payload = {
+            "visit_id": self.visit.id,
+            **{question["field"]: getattr(self.sansa, question["field"])
+               for question in SANSA_QUESTIONS},
+        }
+        payload["q1_weight_change"] = "increase"
+        response = self.client.put(f"/sansa/{self.sansa.id}", json=payload)
+        self.assertEqual(response.status_code, 200)
+        revisions = self.db.query(AssessmentRevision).filter_by(
+            instrument="SANSA", record_id=self.sansa.id
+        ).order_by(AssessmentRevision.revision_number).all()
+        self.assertEqual([row.action_type for row in revisions], ["baseline", "update"])
+        self.assertEqual(revisions[0].snapshot["q1_weight_change"], "stable")
+        self.assertEqual(revisions[1].snapshot["q1_weight_change"], "increase")
+        self.assertEqual(self.client.delete(f"/sansa/{self.sansa.id}").status_code, 409)
+        self.assertEqual(self.db.query(SANSAResponse).filter_by(id=self.sansa.id).count(), 1)
 
     def test_missing_bia_and_no_fabricated_prediction(self):
         self.db.delete(self.bia); self.db.commit()
