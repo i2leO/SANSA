@@ -5,6 +5,7 @@ import AdminLayout from "@/pages/admin/AdminLayout";
 import { AdminCreatePanel, AdminListHeader, AdminPageHeader } from "@/pages/admin/AdminPageUI";
 import { Facility } from "@/types";
 import { useCallback, useEffect, useState } from "react";
+import useAdminListSearch from "@/pages/admin/useAdminListSearch";
 
 function getErrorDetail(err: unknown, fallback: string) {
   if (typeof err === "object" && err !== null) {
@@ -13,6 +14,13 @@ function getErrorDetail(err: unknown, fallback: string) {
     if (typeof detail === "string" && detail.trim()) return detail;
   }
   return fallback;
+}
+
+function mapEmbedUrl(item: Facility) {
+  const query = item.latitude != null && item.longitude != null
+    ? `${item.latitude},${item.longitude}`
+    : item.address || item.name;
+  return `https://www.google.com/maps?q=${encodeURIComponent(query)}&output=embed`;
 }
 
 export default function AdminFacilitiesAdminPage() {
@@ -28,6 +36,7 @@ export default function AdminFacilitiesAdminPage() {
   const [editingId,setEditingId]=useState<number|null>(null);
   const [busyId,setBusyId]=useState<number|null>(null);
   const [isActive,setIsActive]=useState(true);
+  const editingFacility=items.find(item=>item.id===editingId)??null;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -76,7 +85,8 @@ export default function AdminFacilitiesAdminPage() {
   const edit=(item:Facility)=>{setEditingId(item.id);setName(item.name);setAddress(item.address||'');setPhone(item.phone||'');setMapLink(item.map_link||'');setDescription(item.description||'');setIsActive(item.is_active);window.scrollTo({top:0,behavior:'smooth'});};
   const remove=async(item:Facility)=>{if(!confirm(`ลบศูนย์บริการ “${item.name}” หรือไม่?`))return;setBusyId(item.id);setError(null);try{await apiClient.delete(`/facilities/${item.id}`);await load();}catch(err:unknown){setError(getErrorDetail(err,'ลบศูนย์บริการไม่สำเร็จ'));}finally{setBusyId(null);}};
 
-  const table = useTableRows(items);
+  const [search, setSearch] = useAdminListSearch();
+  const table = useTableRows(items, search, setSearch);
 
   return (
     <AdminLayout title="ศูนย์บริการสุขภาพ">
@@ -116,6 +126,13 @@ export default function AdminFacilitiesAdminPage() {
         </div>
         <label className="block mt-4 text-sm font-medium">รายละเอียด<textarea value={description} onChange={e=>setDescription(e.target.value)} placeholder="เช่น เวลาทำการและบริการที่มี" title="ข้อมูลเพิ่มเติมที่เป็นประโยชน์ต่อผู้ใช้" className="sansa-search mt-2" rows={2} /></label>
         <label className="block mt-4 text-sm font-medium">ลิงก์แผนที่ (https://)<input type="url" value={mapLink} onChange={e=>setMapLink(e.target.value)} placeholder="เช่น https://maps.google.com/..." title="วางลิงก์ตำแหน่งจาก Google Maps ที่ขึ้นต้นด้วย https://" className="sansa-search mt-2" /></label>
+        {editingFacility&&<section className="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white" aria-label={`แผนที่ ${editingFacility.name}`}>
+          <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+            <div><h3 className="font-bold text-slate-800">แผนที่ {editingFacility.name}</h3><p className="mt-1 text-sm text-slate-500">{editingFacility.address||'แสดงตำแหน่งจากชื่อศูนย์บริการ'}</p></div>
+            {mapLink&&/^https?:\/\//i.test(mapLink)&&<a href={mapLink} target="_blank" rel="noopener noreferrer" className="font-semibold text-primary-700">เปิด Google Maps ↗</a>}
+          </div>
+          <iframe className="h-[360px] w-full border-0 border-t border-slate-200" title={`แผนที่ ${editingFacility.name}`} src={mapEmbedUrl({...editingFacility,name:name.trim()||editingFacility.name,address:address.trim()||editingFacility.address})} loading="lazy" referrerPolicy="no-referrer-when-downgrade" allowFullScreen />
+        </section>}
         <label className="flex items-center gap-2 mt-4 text-sm font-medium"><input type="checkbox" checked={isActive} onChange={e=>setIsActive(e.target.checked)} /> เปิดใช้งานและแสดงหน้าเว็บไซต์</label>
         <div className="mt-4">
           <button
@@ -134,8 +151,8 @@ export default function AdminFacilitiesAdminPage() {
         <TableControls {...table.controls} />
         {loading ? (
           <div className="p-6 text-gray-600">กำลังโหลด...</div>
-        ) : items.length === 0 ? (
-          <div className="p-6 text-gray-600">ยังไม่มีข้อมูล</div>
+        ) : table.controls.total === 0 ? (
+          <div className="p-6 text-gray-600">{search ? `ไม่พบศูนย์บริการที่ตรงกับ “${search}”` : "ยังไม่มีข้อมูล"}</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
@@ -150,7 +167,20 @@ export default function AdminFacilitiesAdminPage() {
               </thead>
               <tbody>
                 {table.rows.map((f) => (
-                  <tr key={f.id} className="border-t">
+                  <tr
+                    key={f.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`แก้ไขศูนย์บริการ ${f.name}`}
+                    onClick={() => edit(f)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        edit(f);
+                      }
+                    }}
+                    className="group cursor-pointer border-t transition-colors hover:bg-primary-50/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500"
+                  >
                     <td className="px-4 py-3 font-semibold">{f.name}</td>
                     <td className="px-4 py-3 text-gray-600">{f.address || "-"}</td>
                     <td className="px-4 py-3 text-gray-600">{f.phone || "-"}</td>
@@ -161,7 +191,7 @@ export default function AdminFacilitiesAdminPage() {
                         {f.is_active ? "เปิดใช้งาน" : "ปิด"}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right whitespace-nowrap"><button onClick={()=>edit(f)} className="text-primary-700 font-medium">แก้ไข</button><button disabled={busyId===f.id} onClick={()=>remove(f)} className="ml-4 text-red-600 font-medium disabled:opacity-50">ลบ</button></td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap"><button onClick={(event)=>{event.stopPropagation();edit(f);}} className="text-primary-700 font-medium">แก้ไข</button><button disabled={busyId===f.id} onClick={(event)=>{event.stopPropagation();void remove(f);}} className="ml-4 text-red-600 font-medium disabled:opacity-50">ลบ</button></td>
                   </tr>
                 ))}
               </tbody>

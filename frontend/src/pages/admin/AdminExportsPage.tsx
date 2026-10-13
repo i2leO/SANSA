@@ -2,6 +2,7 @@ import apiClient from "@/lib/api";
 import AdminLayout from "@/pages/admin/AdminLayout";
 import { AdminPageHeader } from "@/pages/admin/AdminPageUI";
 import { useState } from "react";
+import useAdminListSearch from "@/pages/admin/useAdminListSearch";
 
 function getErrorDetail(err: unknown, fallback: string) {
   if (typeof err === "object" && err !== null) {
@@ -26,6 +27,7 @@ function downloadBlob(blob: Blob, filename: string) {
 export default function AdminExportsPage() {
   const [error, setError] = useState<string | null>(null);
   const [loadingKey, setLoadingKey] = useState<string | null>(null);
+  const [search] = useAdminListSearch();
 
   const exportOne = async (key: string, path: string, extension = "csv") => {
     setError(null);
@@ -58,6 +60,14 @@ export default function AdminExportsPage() {
       </div>
     </button>
   );
+  const exports = [
+    ["participant_data", "ข้อมูลผู้เข้าร่วมและ SANSA", "/exports/sansa.csv", "csv"],
+    ["prediction", "ผลทำนาย SANSA", "/exports/prediction.csv", "csv"],
+    ["bia_mna_staff", "ข้อมูล BIA และ MNA", "/exports/bia.csv", "csv"],
+    ["satisfaction", "ความพึงพอใจ", "/exports/satisfaction.csv", "csv"],
+    ["sansa_revised4", "ข้อมูลรวมตามต้นแบบ revised4", "/exports/revised4.xlsx", "xlsx"],
+    ["assessment_history", "ประวัติการแก้ไข MNA และ BIA", "/exports/assessment-history.csv", "csv"],
+  ].filter(item => !search.trim() || item.join(' ').toLocaleLowerCase('th').includes(search.trim().toLocaleLowerCase('th')));
 
   return (
     <AdminLayout title="ส่งออกข้อมูล">
@@ -70,13 +80,9 @@ export default function AdminExportsPage() {
       )}
 
       <div className="sansa-export-grid">
-        {btn("participant_data", "ข้อมูลผู้เข้าร่วมและ SANSA", "/exports/sansa.csv")}
-        {btn("prediction", "ผลทำนาย SANSA", "/exports/prediction.csv")}
-        {btn("bia_mna_staff", "ข้อมูล BIA และ MNA", "/exports/bia.csv")}
-        {btn("satisfaction", "ความพึงพอใจ", "/exports/satisfaction.csv")}
-        {btn("sansa_revised4", "ข้อมูลรวมตามต้นแบบ revised4", "/exports/revised4.xlsx", "xlsx")}
-        {btn("assessment_history", "ประวัติการแก้ไข MNA และ BIA", "/exports/assessment-history.csv")}
+        {exports.map(([key, label, path, extension]) => btn(key, label, path, extension))}
       </div>
+      {exports.length === 0 && <div className="sansa-panel p-6 text-slate-500">ไม่พบรายการส่งออกที่ตรงกับ “{search}”</div>}
 
     </AdminLayout>
   );

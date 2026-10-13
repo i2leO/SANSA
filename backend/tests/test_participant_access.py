@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.database import get_db
 from app.auth import get_current_active_admin, get_current_user_optional, get_current_staff_or_admin
-from app.models import Respondent, Visit, User, KnowledgePost, ScoringRuleValue
+from app.models import MNAResponse, Respondent, Visit, User, KnowledgePost, ScoringRuleValue
 from test_sansa_result_integration import fixture
 
 class ParticipantAccessTests(unittest.TestCase):
@@ -13,6 +13,7 @@ class ParticipantAccessTests(unittest.TestCase):
         self.engine,self.db,_,self.visit,self.sansa,self.bia=fixture()
         KnowledgePost.__table__.create(self.engine)
         ScoringRuleValue.__table__.create(self.engine)
+        MNAResponse.__table__.create(self.engine)
         self.other=Respondent(respondent_code='OTHER-SYNTHETIC',age=70,sex='female')
         self.db.add(self.other);self.db.flush()
         self.other_visit=Visit(respondent_id=self.other.id,visit_number=1,visit_date=date.today())
@@ -114,7 +115,11 @@ class ParticipantAccessTests(unittest.TestCase):
     def test_dashboard_and_pagination(self):
         app.dependency_overrides[get_current_staff_or_admin]=lambda:self.admin
         app.dependency_overrides[get_current_user_optional]=lambda:self.admin
-        self.assertEqual(self.client.get('/admin/dashboard').json()['respondents'],2)
+        dashboard = self.client.get('/admin/dashboard').json()
+        self.assertEqual(dashboard['respondents'],2)
+        self.assertEqual(dashboard['incomplete_visits'],2)
+        self.assertEqual(dashboard['knowledge_drafts'],0)
+        self.assertEqual(dashboard['facilities_inactive'],0)
         first=self.client.get('/respondents?limit=1&skip=0');second=self.client.get('/respondents?limit=1&skip=1')
         self.assertEqual(first.headers['x-total-count'],'2')
         self.assertNotEqual(first.json()[0]['id'],second.json()[0]['id'])

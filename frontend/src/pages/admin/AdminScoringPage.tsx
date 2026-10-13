@@ -3,6 +3,7 @@ import AdminLayout from "@/pages/admin/AdminLayout";
 import { AdminPageHeader } from "@/pages/admin/AdminPageUI";
 import { useAuthStore } from "@/stores/authStore";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import useAdminListSearch from "@/pages/admin/useAdminListSearch";
 
 function getErrorDetail(err: unknown, fallback: string) {
   if (typeof err === "object" && err !== null) {
@@ -41,6 +42,7 @@ export default function AdminScoringPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [savingId, setSavingId] = useState<number | null>(null);
+  const [search] = useAdminListSearch();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -66,6 +68,14 @@ export default function AdminScoringPage() {
   );
   const isApprovedSansa = selected?.instrument_name === "SANSA" && selected.version_number === "0.2.4-20261008";
   const isLegacySansa = selected?.instrument_name === "SANSA" && !isApprovedSansa;
+  const visibleRuleValues = useMemo(() => {
+    if (!selected) return [];
+    const key = search.trim().toLocaleLowerCase('th');
+    if (!key) return selected.rule_values;
+    return selected.rule_values.filter(value =>
+      `${value.level_code} ${value.level_name} ${value.min_score ?? ''} ${value.max_score ?? ''} ${value.advice_text ?? ''}`.toLocaleLowerCase('th').includes(key),
+    );
+  }, [search, selected]);
 
   const updateLocalValue = (valueId: number, patch: Partial<ScoringValue>) => {
     setVersions((prev) =>
@@ -188,7 +198,7 @@ export default function AdminScoringPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {selected.rule_values.map((rv) => (
+                  {visibleRuleValues.map((rv) => (
                     <tr key={rv.id} className="border-t align-top">
                       <td className="px-4 py-3 font-mono">{rv.level_code}</td>
                       <td className="px-4 py-3">
@@ -242,6 +252,7 @@ export default function AdminScoringPage() {
                       </td>
                     </tr>
                   ))}
+                  {visibleRuleValues.length === 0 && search.trim() && <tr><td colSpan={6} className="px-4 py-6 text-center text-slate-500">ไม่พบกฎคะแนนที่ตรงกับ “{search}”</td></tr>}
                 </tbody>
               </table>
             </div>

@@ -6,6 +6,7 @@ import { AdminCreatePanel, AdminListHeader, AdminPageHeader } from "@/pages/admi
 import { User, UserRole } from "@/types";
 import { useCallback, useEffect, useState } from "react";
 import QRCode from "qrcode";
+import useAdminListSearch from "@/pages/admin/useAdminListSearch";
 
 function getErrorDetail(err: unknown, fallback: string) {
   if (typeof err === "object" && err !== null) {
@@ -99,7 +100,8 @@ export default function AdminUsersPage() {
     } finally {setBusyId(null);}
   };
 
-  const table = useTableRows(users);
+  const [search, setSearch] = useAdminListSearch();
+  const table = useTableRows(users, search, setSearch);
 
   return (
     <AdminLayout title="จัดการผู้ใช้">
@@ -179,8 +181,8 @@ export default function AdminUsersPage() {
         <TableControls {...table.controls} />
         {loading ? (
           <div className="p-6 text-gray-600">กำลังโหลด...</div>
-        ) : users.length === 0 ? (
-          <div className="p-6 text-gray-600">ไม่พบข้อมูล</div>
+        ) : table.controls.total === 0 ? (
+          <div className="p-6 text-gray-600">{search ? `ไม่พบบัญชีที่ตรงกับ “${search}”` : "ไม่พบข้อมูล"}</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">

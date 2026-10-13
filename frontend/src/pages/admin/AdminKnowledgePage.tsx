@@ -5,6 +5,7 @@ import AdminLayout from "@/pages/admin/AdminLayout";
 import { AdminCreatePanel, AdminListHeader, AdminPageHeader } from "@/pages/admin/AdminPageUI";
 import { KnowledgePost } from "@/types";
 import { useCallback, useEffect, useState } from "react";
+import useAdminListSearch from "@/pages/admin/useAdminListSearch";
 
 function getErrorDetail(err: unknown, fallback: string) {
   if (typeof err === "object" && err !== null) {
@@ -74,7 +75,8 @@ export default function AdminKnowledgePage() {
   const edit=(post:KnowledgePost)=>{setEditingId(post.id);setTitle(post.title);setContent(post.content||'');setSummary(post.summary||'');setCategory(post.category||'');setIsPublished(post.is_published);window.scrollTo({top:0,behavior:'smooth'});};
   const remove=async(post:KnowledgePost)=>{if(!confirm(`ลบบทความ “${post.title}” หรือไม่?`))return;setBusyId(post.id);setError(null);try{await apiClient.delete(`/knowledge/${post.id}`);if(editingId===post.id){setEditingId(null);setTitle('');setContent('');setSummary('');setCategory('');setIsPublished(false);}await load();}catch(err:unknown){setError(getErrorDetail(err,'ลบบทความไม่สำเร็จ'));}finally{setBusyId(null);}};
 
-  const table = useTableRows(posts);
+  const [search, setSearch] = useAdminListSearch();
+  const table = useTableRows(posts, search, setSearch);
 
   return (
     <AdminLayout title="เนื้อหาความรู้">
@@ -131,8 +133,8 @@ export default function AdminKnowledgePage() {
         <TableControls {...table.controls} />
         {loading ? (
           <div className="p-6 text-gray-600">กำลังโหลด...</div>
-        ) : posts.length === 0 ? (
-          <div className="p-6 text-gray-600">ยังไม่มีบทความ</div>
+        ) : table.controls.total === 0 ? (
+          <div className="p-6 text-gray-600">{search ? `ไม่พบบทความที่ตรงกับ “${search}”` : "ยังไม่มีบทความ"}</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
@@ -148,7 +150,20 @@ export default function AdminKnowledgePage() {
               </thead>
               <tbody>
                 {table.rows.map((p) => (
-                  <tr key={p.id} className="border-t">
+                  <tr
+                    key={p.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`แก้ไขบทความ ${p.title}`}
+                    onClick={() => edit(p)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        edit(p);
+                      }
+                    }}
+                    className="group cursor-pointer border-t transition-colors hover:bg-primary-50/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500"
+                  >
                     <td className="px-4 py-3 font-semibold">{p.title}</td>
                     <td className="px-4 py-3">{p.category || "-"}</td>
                     <td className="px-4 py-3">
@@ -160,7 +175,7 @@ export default function AdminKnowledgePage() {
                     </td>
                     <td className="px-4 py-3">{p.media_type === 'pdf' ? 'PDF' : p.media_type === 'image' ? 'ภาพ' : '-'}</td>
                     <td className="px-4 py-3 font-mono text-gray-700">{p.slug}</td>
-                    <td className="px-4 py-3 text-right whitespace-nowrap"><button onClick={()=>edit(p)} className="text-primary-700 font-medium">แก้ไข</button><button disabled={busyId===p.id} onClick={()=>remove(p)} className="ml-4 text-red-600 font-medium disabled:opacity-50">ลบ</button></td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap"><button onClick={(event)=>{event.stopPropagation();edit(p);}} className="text-primary-700 font-medium">แก้ไข</button><button disabled={busyId===p.id} onClick={(event)=>{event.stopPropagation();void remove(p);}} className="ml-4 text-red-600 font-medium disabled:opacity-50">ลบ</button></td>
                   </tr>
                 ))}
               </tbody>

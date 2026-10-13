@@ -1,5 +1,31 @@
 # SANSA: บริบทสำหรับการ Rework
 
+## 2026-10-12 — Facility map preview in admin detail
+
+- เมื่อแอดมินหรือเจ้าหน้าที่กดแถวศูนย์บริการเพื่อเปิดฟอร์มแก้ไข ระบบจะแสดงพรีวิวแผนที่ของศูนย์นั้นใต้ข้อมูล พร้อมลิงก์เปิด Google Maps เมื่อมี `map_link`
+- พรีวิวใช้ `latitude,longitude` เป็นหลักเมื่อมีข้อมูล และใช้ที่อยู่หรือชื่อเป็น fallback
+- การเปลี่ยนแปลงจำกัดที่หน้า `AdminFacilitiesAdminPage`; ไม่เปลี่ยน API, schema, ข้อมูลศูนย์บริการ หรือพฤติกรรมหน้าสาธารณะ
+- ตรวจ `npm run lint` และ `npm run build` ผ่านแล้ว
+
+## 2026-10-12 — Full local-to-production replacement
+
+- ผู้ใช้สั่งชัดเจนให้ deploy โค้ดล่าสุดและใช้ฐานข้อมูล local แทน production ทั้งฐาน โดยไม่สำรอง production เดิม จึงหยุด backend, drop/recreate ฐาน production และ import dump จาก `sansa_rework_local` ตามคำสั่ง
+- ตรวจ SHA-256 ของ backend release, frontend release และ SQL dump ก่อนใช้งานบน VPS แล้วตรงกับไฟล์ต้นทาง
+- Production หลังแทนฐานตรงกับ local: respondents/visits/SANSA/MNA/BIA = 200/200/200/200/200, knowledge 25, facilities 69, users 4, source import batches 3 และ assessment revisions 804
+- Production users ตาม local มี admin 1, staff 2 และ user 1; ตรวจบัญชี admin, password verification, `/auth/login`, `/auth/me` และ role admin ผ่านโดยไม่แสดง token
+- Alembic อยู่ที่ `20261010_13`; backend PID หลัง restart คือ 556111; health ผ่านทั้ง localhost และ `https://sansa-ntc.org/api/health`
+- Frontend production ใช้ `assets/index-Cf6aV9ss.js` และรวม contextual search: ช่องค้นหาด้านบนกรองรายการของหน้าปัจจุบัน ไม่ใช่ค้นหาเมนู; หน้า detail ที่ไม่มี list จะซ่อนช่องค้นหา
+- ไม่มี production pre-replacement backup ตามคำสั่งผู้ใช้ ไฟล์ backup จาก deployment วันที่ 11 ต.ค. ที่มีอยู่เดิมไม่ได้ถูกสร้างหรือยืนยันใหม่ในรอบนี้
+
+## 2026-10-12 — Admin navigation and production-data divergence
+
+- เปลี่ยนช่องค้นหาเมนูจากแบบต้องพิมพ์แล้วกด Enter โดยไม่มี feedback เป็นรายการผลลัพธ์ที่มองเห็น เลือกได้ และใช้คีย์บอร์ดได้ ครอบคลุมหน้า Home และเมนูตามสิทธิ์ผู้ใช้
+- เปลี่ยนกระดิ่งที่เคยแสดงข้อความคงที่ให้ดึงสถานะจริงจาก `/admin/dashboard`: รอบประเมินที่ขาด SANSA/MNA/BIA, บทความฉบับร่าง และศูนย์บริการที่ปิดใช้งาน รายการเหล่านี้เป็น operational/data-completeness notice เท่านั้น ไม่มีการเพิ่มหรือเปลี่ยนกฎคะแนนทางคลินิก
+- แถวรายการเนื้อหาความรู้และศูนย์บริการเปิดฟอร์มแก้ไขได้ทั้งแถวด้วยเมาส์หรือคีย์บอร์ด ปุ่มแก้ไข/ลบด้านในหยุด row event เพื่อไม่ให้การลบเปิดฟอร์มโดยไม่ตั้งใจ
+- Focused backend dashboard/content tests ผ่าน; frontend lint และ production build ผ่าน
+- ตรวจจำนวนแบบ read-only แล้วพบว่า production ไม่ใช่ baseline เดียวกับ local: production มี respondents/visits/SANSA/MNA/BIA = 246/243/241/209/208, knowledge 1, facilities 3, users 1; local = 200/200/200/200/200, knowledge 25, facilities 69, users 4
+- ข้อจำกัดเดิมเรื่องยังไม่เขียนทับ production ถูกยกเลิกภายหลังเมื่อผู้ใช้สั่งให้แทน production ด้วย local ทั้งฐานโดยตรงและไม่ต้องสำรอง; ผลดำเนินการบันทึกไว้ในหัวข้อ Full local-to-production replacement ด้านบน
+
 ## 2026-10-11 — Production deployment
 
 - Deploy source ปัจจุบันขึ้น `sansa-ntc.org` แล้วผ่าน SSH key โดยไม่บันทึกรหัสผ่านไว้ใน repository; frontend production hotfix ใช้ asset `assets/index-DjbrCzvq.js`

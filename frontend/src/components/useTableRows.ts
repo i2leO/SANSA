@@ -1,6 +1,8 @@
 import { useState } from 'react';
-export default function useTableRows<T>(items:T[]) {
-  const [search,setSearch]=useState('');
+export default function useTableRows<T>(items:T[], controlledSearch?:string, onControlledSearch?:(value:string)=>void) {
+  const [internalSearch,setInternalSearch]=useState('');
+  const search=controlledSearch ?? internalSearch;
+  const setSearch=onControlledSearch ?? setInternalSearch;
   const [page,setPage]=useState(0);
   const [size,setSize]=useState(10);
   const filtered=items.filter(item=>JSON.stringify(item).toLowerCase().includes(search.toLowerCase()));

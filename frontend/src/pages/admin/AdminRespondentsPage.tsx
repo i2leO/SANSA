@@ -5,6 +5,7 @@ import { AdminCreatePanel, AdminListHeader, AdminPageHeader } from "@/pages/admi
 import { Respondent } from "@/types";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import useAdminListSearch from "@/pages/admin/useAdminListSearch";
 
 function getErrorDetail(err: unknown, fallback: string) {
   if (typeof err === "object" && err !== null) {
@@ -20,7 +21,7 @@ export default function AdminRespondentsPage() {
   const [respondents, setRespondents] = useState<Respondent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useAdminListSearch();
   const [refreshKey,setRefreshKey]=useState(0);
 
   const [page,setPage]=useState(0);

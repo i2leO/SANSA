@@ -91,14 +91,19 @@ a:focus-visible, button:focus-visible, input:focus-visible { outline: 3px solid 
 .sansa-admin-nav a.active { background: #16c9c6; color: #073e42; font-weight: 700; }
 .sansa-admin-workspace { margin-left: 264px; }
 .sansa-admin-header { min-height: 80px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 32px; background: white; border-bottom: 1px solid #e0e7ef; }
-.sansa-admin-search { width: min(620px,55%); height: 48px; display: flex; align-items: center; gap: 12px; padding: 0 16px; border: 1px solid #dce5ee; border-radius: 14px; background: #f8fafc; color: #91a0b4; }
+.sansa-admin-search-wrap { position: relative; width: min(620px,55%); }
+.sansa-admin-search { width: 100%; height: 48px; display: flex; align-items: center; gap: 12px; padding: 0 16px; border: 1px solid #dce5ee; border-radius: 14px; background: #f8fafc; color: #91a0b4; }
+.sansa-admin-search button { flex-shrink: 0; font-size: 20px; }
 .sansa-admin-search input { width: 100%; border: 0; outline: 0; background: transparent; color: #172033; }
 .sansa-header-actions { display: flex; align-items: center; gap: 14px; }
 .sansa-header-icon { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 10px; color: #657991; font-size: 22px; }
 .sansa-header-icon:hover { background: #effbfb; color: #087d80; }
 .sansa-header-icon i { position: absolute; right: 7px; top: 6px; width: 8px; height: 8px; border-radius: 50%; background: #18c8c4; }
-.sansa-notification-popover { position: absolute; z-index: 30; right: 0; top: 48px; width: 230px; padding: 16px; border: 1px solid #dce5ee; border-radius: 14px; background: white; box-shadow: 0 12px 30px #17203320; font-size: 14px; }
+.sansa-notification-popover { position: absolute; z-index: 30; right: 0; top: 48px; width: min(360px,calc(100vw - 32px)); padding: 16px; border: 1px solid #dce5ee; border-radius: 14px; background: white; box-shadow: 0 12px 30px #17203320; font-size: 14px; }
 .sansa-notification-popover p { margin-top: 8px; color: #697c95; }
+.sansa-notification-popover li { margin-top: 8px; border-top: 1px solid #edf2f7; }
+.sansa-notification-popover li button { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0 2px; text-align: left; color: #42526a; }
+.sansa-notification-popover li button:hover { color: #087d80; }
 .sansa-avatar { display: flex; align-items: center; justify-content: center; width: 42px; height: 42px; flex-shrink: 0; border-radius: 50%; color: white; background: linear-gradient(135deg,#17c7c6,#0d9190); font-size: 14px; font-weight: 600; }
 .sansa-menu-icon { display: inline-flex; align-items: center; justify-content: center; height: 50px; width: 50px; border-radius: 15px; font-size: 27px; }
 .sansa-icon-teal { background: #eafffc; color: #0b9998; }
@@ -163,7 +168,7 @@ a:focus-visible, button:focus-visible, input:focus-visible { outline: 3px solid 
   .sansa-admin-nav a span { font-size: 18px; }
   .sansa-admin-workspace { margin-left: 0; }
   .sansa-admin-header { min-height: 64px; padding: 14px 20px; }
-  .sansa-admin-search { width: 100%; }
+  .sansa-admin-search-wrap { width: 100%; }
   .sansa-header-actions .hidden { display: none; }
   .sansa-page-heading h1 { font-size: 22px; }
   .sansa-table-pagination { align-items: flex-start; flex-direction: column; }
